@@ -1,0 +1,19 @@
+## Build results
+[Bb]in/
+[Oo]bj/
+
+## Visual Studio / VS Code
+.vs/
+.vscode/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+## Project specific exclusion rules (Global rules)
+Installer/
+MSIX/
+
+## Audio / Temporary scratch files
+*.log
+*.tmp
