@@ -41,6 +41,17 @@ public class AppSettings
     // MP3エンコード設定
     public int Mp3Bitrate { get; set; } = 192; // 128, 192, 256, 320 kbps
 
+    // BGM設定
+    public string BgmFilePath { get; set; } = string.Empty;
+    public bool EnableBgm { get; set; } = false;
+    public double BgmVolume { get; set; } = 0.15; // 0.0 〜 1.0 (デフォルト 15%)
+
+    // エンディング曲設定
+    public string EndingFilePath { get; set; } = string.Empty;
+    public bool EnableEnding { get; set; } = false;
+    public double EndingVolume { get; set; } = 0.80; // 0.0 〜 1.0 (デフォルト 80%)
+    public double EndingExtraSeconds { get; set; } = 15.0; // 本編終了後の余韻秒数 (デフォルト 15秒)
+
     // ID3タグ設定 (固定値保存対応)
     public string DefaultTitle { get; set; } = string.Empty;
     public string DefaultArtist { get; set; } = "木澤 朋和";

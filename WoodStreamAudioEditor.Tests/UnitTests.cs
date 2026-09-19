@@ -485,6 +485,162 @@ public class UnitTests
         Assert.IsTrue(Math.Abs(duration - 3.0) < 0.3, $"再生時間が約3.0秒であること (実際: {duration:F2}秒)");
     }
 
+    /// <summary>
+    /// TimelineMixingSampleProvider の BGM（10秒前から5秒間でフェードアウト）および
+    /// エンディング曲（5秒前から5秒間でフェードイン）のタイムライン音量遷移の精密検証
+    /// </summary>
+    [TestMethod]
+    public void TestTimelineMixing_BgmAndEndingFade()
+    {
+        int sampleRate = 48000;
+        int channels = 2;
+        var format = WaveFormat.CreateIeeeFloatWaveFormat(sampleRate, channels);
+
+        // 本編音声: 20秒 (振幅 0.0 の無音をベースにしてBGMとEDの音量遷移を純粋に検証)
+        long mainVoiceFrames = sampleRate * 20;
+        float[] voiceSamples = new float[mainVoiceFrames * channels];
+        var voiceSource = new TestArraySampleProvider(format, voiceSamples);
+
+        // BGM音声: 5秒のテスト音源 (振幅 1.0f)
+        float[] bgmSamples = new float[sampleRate * 5 * channels];
+        Array.Fill(bgmSamples, 1.0f);
+        var bgmSource = new TestArraySampleProvider(format, bgmSamples);
+
+        // エンディング音声: 10秒のテスト音源 (振幅 1.0f)
+        float[] edSamples = new float[sampleRate * 10 * channels];
+        Array.Fill(edSamples, 1.0f);
+        var edSource = new TestArraySampleProvider(format, edSamples);
+
+        // タイムラインパラメータ設定
+        long bgmFadeOutStart = mainVoiceFrames - (sampleRate * 10); // 10秒地点 (480,000フレーム)
+        long bgmFadeOutDuration = sampleRate * 5;                  // 5秒間 (240,000フレーム)
+        long edFadeInStart = mainVoiceFrames - (sampleRate * 5);     // 15秒地点 (720,000フレーム)
+        long edFadeInDuration = sampleRate * 5;                    // 5秒間 (240,000フレーム)
+        long totalMixFrames = mainVoiceFrames + (sampleRate * 5);  // 本編終了後5秒余韻 (計25秒)
+
+        var bgmTrack = new MixingTrack(bgmSource)
+        {
+            Volume = 0.20f,
+            StartFrame = 0,
+            StopFrame = bgmFadeOutStart + bgmFadeOutDuration, // 15秒地点で停止
+            FadeOutStartFrame = bgmFadeOutStart,
+            FadeOutDurationFrames = bgmFadeOutDuration,
+            Loop = true,
+            OnLoopReset = () => { bgmSource.Reset(); }
+        };
+
+        var edTrack = new MixingTrack(edSource)
+        {
+            Volume = 0.80f,
+            StartFrame = edFadeInStart,
+            StopFrame = totalMixFrames,
+            FadeInStartFrame = edFadeInStart,
+            FadeInDurationFrames = edFadeInDuration
+        };
+
+        var mixer = new TimelineMixingSampleProvider(
+            voiceSource,
+            mainVoiceFrames,
+            bgmTrack,
+            edTrack,
+            totalMixFrames);
+
+        // 全体を 1秒 (sampleRate * channels サンプル) ごとに読み出して音量をサンプリング検証
+        float[] oneSecBuffer = new float[sampleRate * channels];
+        float[][] sampledSeconds = new float[25][];
+
+        for (int sec = 0; sec < 25; sec++)
+        {
+            int read = mixer.Read(oneSecBuffer.AsSpan());
+            sampledSeconds[sec] = (float[])oneSecBuffer.Clone();
+            Assert.AreEqual(sampleRate * channels, read, $"第 {sec} 秒のサンプル数が一致すること");
+        }
+
+        // 1. 0〜9秒: BGMがフル音量 (0.20f)、EDは 0
+        Assert.AreEqual(0.20f, sampledSeconds[5][0], 0.01f, "5秒地点ではBGMが0.20fで再生されていること");
+
+        // 2. 12秒地点 (10秒〜15秒のフェードアウト中間): BGMは約 0.10f (半減)、EDは 0
+        Assert.IsTrue(sampledSeconds[12][0] > 0.05f && sampledSeconds[12][0] < 0.15f, 
+            $"12秒地点ではBGMフェードアウト中であること (実際: {sampledSeconds[12][0]:F3})");
+
+        // 3. 15秒地点 (本編終了5秒前): BGMは完全終了 (0.0f)、EDフェードイン開始 (0.0f)
+        Assert.AreEqual(0.0f, sampledSeconds[15][0], 0.02f, "15秒地点ではBGMが終了し、EDが立ち上がり始めであること");
+
+        // 4. 17秒地点 (15秒〜20秒のフェードイン中間): EDは約 0.32f〜0.48f (0.80fの半分付近)
+        Assert.IsTrue(sampledSeconds[17][0] > 0.25f && sampledSeconds[17][0] < 0.55f, 
+            $"17秒地点ではEDフェードイン中であること (実際: {sampledSeconds[17][0]:F3})");
+
+        // 5. 20秒地点 (本編終了直後): EDがフル音量 0.80f に到達していること
+        Assert.AreEqual(0.80f, sampledSeconds[20][0], 0.02f, "20秒地点(本編終了直後)でEDが100%音量(0.80f)に到達していること");
+    }
+
+    /// <summary>
+    /// BGMおよびエンディング曲を含むパイプライン全体のミキシング結合テスト
+    /// </summary>
+    [TestMethod]
+    public async Task TestAudioPipelineWithBgmAndEndingMixing()
+    {
+        int sampleRate = 44100;
+        int channels = 2;
+
+        // 1. 本編WAV作成 (15秒)
+        string voiceWav = Path.Combine(_tempDir, "voice_input.wav");
+        var format = new WaveFormat(sampleRate, 16, channels);
+        using (var writer = new WaveFileWriter(voiceWav, format))
+        {
+            byte[] buf = new byte[format.AverageBytesPerSecond * 15];
+            writer.Write(buf, 0, buf.Length);
+        }
+
+        // 2. BGM WAV作成 (4秒)
+        string bgmWav = Path.Combine(_tempDir, "bgm_track.wav");
+        using (var writer = new WaveFileWriter(bgmWav, format))
+        {
+            byte[] buf = new byte[format.AverageBytesPerSecond * 4];
+            writer.Write(buf, 0, buf.Length);
+        }
+
+        // 3. ED WAV作成 (8秒)
+        string edWav = Path.Combine(_tempDir, "ending_track.wav");
+        using (var writer = new WaveFileWriter(edWav, format))
+        {
+            byte[] buf = new byte[format.AverageBytesPerSecond * 8];
+            writer.Write(buf, 0, buf.Length);
+        }
+
+        var pipeline = new AudioPipelineService();
+        var settings = new AppSettings
+        {
+            EnableDeClick = false,
+            EnableVoiceDeNoise = false,
+            EnableSilenceTruncation = false,
+            EnableTrim = false,
+            Mp3Bitrate = 192,
+            EnableBgm = true,
+            BgmFilePath = bgmWav,
+            BgmVolume = 0.15,
+            EnableEnding = true,
+            EndingFilePath = edWav,
+            EndingVolume = 0.80,
+            EndingExtraSeconds = 5.0 // 本編終了後5秒余韻
+        };
+
+        var progress = new Progress<PipelineProgress>(_ => { });
+        string outputMp3 = await pipeline.ProcessAudioAsync(
+            voiceWav,
+            _tempDir,
+            settings,
+            progress,
+            System.Threading.CancellationToken.None);
+
+        Assert.IsTrue(File.Exists(outputMp3), "ミックス後のMP3が出力されていること");
+
+        // 本編15秒 + 余韻5秒 = 約20秒
+        using var mp3 = new Mp3FileReader(outputMp3);
+        double dur = mp3.TotalTime.TotalSeconds;
+        Assert.IsTrue(Math.Abs(dur - 20.0) < 0.5, $"総再生時間が約20秒であること (実際: {dur:F2}秒)");
+    }
+
     private static byte[] CreateMinimalPng()
     {
         // 1x1 RGBA PNG バイナリ
@@ -514,6 +670,8 @@ public class UnitTests
             WaveFormat = waveFormat;
             _samples = samples;
         }
+
+        public void Reset() => _position = 0;
 
         public int Read(Span<float> buffer)
         {

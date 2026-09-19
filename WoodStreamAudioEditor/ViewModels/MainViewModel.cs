@@ -126,6 +126,30 @@ public partial class MainViewModel : ObservableObject
     public ObservableCollection<int> AvailableBitrates { get; }
 
     // ==========================================
+    // 3.5. BGM・エンディング曲ミキシング設定
+    // ==========================================
+    [ObservableProperty]
+    private string _bgmFilePath = string.Empty;
+
+    [ObservableProperty]
+    private bool _enableBgm = false;
+
+    [ObservableProperty]
+    private double _bgmVolume = 0.15; // 0.0 〜 1.0 (デフォルト 15%)
+
+    [ObservableProperty]
+    private string _endingFilePath = string.Empty;
+
+    [ObservableProperty]
+    private bool _enableEnding = false;
+
+    [ObservableProperty]
+    private double _endingVolume = 0.80; // 0.0 〜 1.0 (デフォルト 80%)
+
+    [ObservableProperty]
+    private double _endingExtraSeconds = 15.0; // 本編終了後の余韻秒数 (デフォルト 15秒)
+
+    // ==========================================
     // 4. ID3 タグ情報
     // ==========================================
     [ObservableProperty]
@@ -273,6 +297,60 @@ public partial class MainViewModel : ObservableObject
             VoiceDeNoisePluginPath = dlg.FileName;
             AppendLog($"[Voice De-noise プラグイン設定] {dlg.FileName}");
         }
+    }
+
+    [RelayCommand]
+    private void BrowseBgmFile()
+    {
+        var dlg = new OpenFileDialog
+        {
+            Filter = Strings.IsJapanese 
+                ? "音声ファイル (*.wav;*.mp3)|*.wav;*.mp3|すべてのファイル (*.*)|*.*" 
+                : "Audio Files (*.wav;*.mp3)|*.wav;*.mp3|All Files (*.*)|*.*",
+            Title = Strings.BgmFile
+        };
+
+        if (dlg.ShowDialog() == true)
+        {
+            BgmFilePath = dlg.FileName;
+            EnableBgm = true;
+            AppendLog($"[BGM音源設定] {dlg.FileName}");
+        }
+    }
+
+    [RelayCommand]
+    private void ClearBgmFile()
+    {
+        BgmFilePath = string.Empty;
+        EnableBgm = false;
+        AppendLog("[BGM音源解除]");
+    }
+
+    [RelayCommand]
+    private void BrowseEndingFile()
+    {
+        var dlg = new OpenFileDialog
+        {
+            Filter = Strings.IsJapanese 
+                ? "音声ファイル (*.wav;*.mp3)|*.wav;*.mp3|すべてのファイル (*.*)|*.*" 
+                : "Audio Files (*.wav;*.mp3)|*.wav;*.mp3|All Files (*.*)|*.*",
+            Title = Strings.EndingFile
+        };
+
+        if (dlg.ShowDialog() == true)
+        {
+            EndingFilePath = dlg.FileName;
+            EnableEnding = true;
+            AppendLog($"[エンディング曲設定] {dlg.FileName}");
+        }
+    }
+
+    [RelayCommand]
+    private void ClearEndingFile()
+    {
+        EndingFilePath = string.Empty;
+        EnableEnding = false;
+        AppendLog("[エンディング曲解除]");
     }
 
     [RelayCommand]
@@ -521,6 +599,15 @@ public partial class MainViewModel : ObservableObject
 
         SelectedBitrate = settings.Mp3Bitrate > 0 ? settings.Mp3Bitrate : 192;
 
+        BgmFilePath = settings.BgmFilePath;
+        EnableBgm = settings.EnableBgm;
+        BgmVolume = settings.BgmVolume > 0 ? settings.BgmVolume : 0.15;
+
+        EndingFilePath = settings.EndingFilePath;
+        EnableEnding = settings.EnableEnding;
+        EndingVolume = settings.EndingVolume > 0 ? settings.EndingVolume : 0.80;
+        EndingExtraSeconds = settings.EndingExtraSeconds >= 0 ? settings.EndingExtraSeconds : 15.0;
+
         TagArtist = settings.DefaultArtist;
         TagAlbum = settings.DefaultAlbum;
         TagArtworkPath = settings.DefaultArtworkPath;
@@ -566,6 +653,13 @@ public partial class MainViewModel : ObservableObject
             SilenceThresholdDb = SilenceThresholdDb,
             MinSilenceDurationMs = MinSilenceDurationMs,
             Mp3Bitrate = SelectedBitrate,
+            BgmFilePath = BgmFilePath,
+            EnableBgm = EnableBgm,
+            BgmVolume = BgmVolume,
+            EndingFilePath = EndingFilePath,
+            EnableEnding = EnableEnding,
+            EndingVolume = EndingVolume,
+            EndingExtraSeconds = EndingExtraSeconds,
             DefaultTitle = TagTitle,
             DefaultArtist = TagArtist,
             DefaultAlbum = TagAlbum,

@@ -130,49 +130,207 @@ public class AudioPipelineService
                     currentProvider = silenceProvider;
                 }
 
-                // 5. MP3エンコード書き出し
-                progress.Report(new PipelineProgress(25, $"MP3エンコード準備: {settings.Mp3Bitrate} kbps -> {Path.GetFileName(outputFilePath)}", true));
+                // 5. BGM / エンディング曲のミキシング判定
+                bool hasBgm = settings.EnableBgm && !string.IsNullOrWhiteSpace(settings.BgmFilePath) && File.Exists(settings.BgmFilePath);
+                bool hasEnding = settings.EnableEnding && !string.IsNullOrWhiteSpace(settings.EndingFilePath) && File.Exists(settings.EndingFilePath);
+                bool requiresMixing = hasBgm || hasEnding;
 
-                // IEEE Float 32-bit SampleProvider を 16-bit PCM WaveProvider に変換して Lame に渡す
-                var pcmProvider = currentProvider.ToWaveProvider16();
-
-                // LameMP3FileWriter によるエンコード
-                using (var writer = new LameMP3FileWriter(outputFilePath, pcmProvider.WaveFormat, settings.Mp3Bitrate))
+                if (requiresMixing)
                 {
-                    byte[] buffer = new byte[32768]; // 32KB バッファ
-                    long totalBytesWritten = 0;
-                    DateTime lastReportTime = DateTime.UtcNow;
-                    int lastReportedMilestone = 25;
-
-                    while (true)
+                    // 【2パス方式】
+                    // パス1: 音声処理（トリミング、VST、無音カット）済みの本編音声を一時WAVファイルへ出力して正確な長さを確定
+                    string tempVoiceWav = Path.Combine(outputDirectory, $"{inputFileNameWithoutExt}_temp_voice_{Guid.NewGuid():N}.wav");
+                    try
                     {
-                        cancellationToken.ThrowIfCancellationRequested();
+                        progress.Report(new PipelineProgress(25, "本編音声の処理中（VST・無音カット確定）...", true));
 
-                        int bytesRead = pcmProvider.Read(buffer.AsSpan());
-                        if (bytesRead == 0) break;
+                        // 48kHz ステレオの PCM 16-bit で一時書き出し
+                        ISampleProvider stereoVoiceProvider = currentProvider.WaveFormat.Channels == 1
+                            ? new NAudio.Wave.SampleProviders.MonoToStereoSampleProvider(currentProvider)
+                            : currentProvider;
 
-                        writer.Write(buffer, 0, bytesRead);
-                        totalBytesWritten += bytesRead;
-
-                        // reader.Position / reader.Length に基づいて正確に進捗率 (25% 〜 95%) を計算
-                        double ratio = reader.Length > 0 
-                            ? Math.Clamp((double)reader.Position / reader.Length, 0.0, 1.0) 
-                            : 0.0;
-                        double percent = 25.0 + (ratio * 70.0);
-
-                        // プログレスバーの更新 (LogToConsole = false)
-                        if ((DateTime.UtcNow - lastReportTime).TotalMilliseconds >= 250)
+                        if (stereoVoiceProvider.WaveFormat.SampleRate != 48000)
                         {
-                            progress.Report(new PipelineProgress(percent, $"エンコード中... ({percent:F0}%)", false));
-                            lastReportTime = DateTime.UtcNow;
+                            stereoVoiceProvider = new NAudio.Wave.SampleProviders.WdlResamplingSampleProvider(stereoVoiceProvider, 48000);
                         }
 
-                        // 25%ごとの主要マイルストーン時のみログに出力
-                        int milestone = ((int)percent / 25) * 25;
-                        if (milestone > lastReportedMilestone && milestone < 95)
+                        var tempPcmProvider = stereoVoiceProvider.ToWaveProvider16();
+                        using (var wavWriter = new WaveFileWriter(tempVoiceWav, tempPcmProvider.WaveFormat))
                         {
-                            progress.Report(new PipelineProgress(percent, $"音声処理・エンコード進行中: {milestone}% 完了", true));
-                            lastReportedMilestone = milestone;
+                            byte[] tempBuf = new byte[32768];
+                            while (true)
+                            {
+                                cancellationToken.ThrowIfCancellationRequested();
+                                int read = tempPcmProvider.Read(tempBuf.AsSpan());
+                                if (read == 0) break;
+                                wavWriter.Write(tempBuf, 0, read);
+
+                                double ratio = reader.Length > 0 ? Math.Clamp((double)reader.Position / reader.Length, 0.0, 1.0) : 0.0;
+                                double pct = 25.0 + (ratio * 30.0); // 25% 〜 55%
+                                progress.Report(new PipelineProgress(pct, $"本編音声処理中... ({pct:F0}%)", false));
+                            }
+                        }
+
+                        // パス2: BGM / エンディング曲をタイムライン合成
+                        progress.Report(new PipelineProgress(55, "BGM・エンディング曲をミキシング中...", true));
+
+                        using var voiceReader = new AudioFileReader(tempVoiceWav);
+                        long mainVoiceFrames = voiceReader.Length / voiceReader.WaveFormat.BlockAlign;
+                        double mainVoiceDuration = (double)mainVoiceFrames / voiceReader.WaveFormat.SampleRate;
+
+                        progress.Report(new PipelineProgress(58, $"確定した本編再生時間: {TimeSpan.FromSeconds(mainVoiceDuration):mm\\:ss}", true));
+
+                        MixingTrack? bgmTrack = null;
+                        AudioFileReader? bgmReader = null;
+                        if (hasBgm)
+                        {
+                            progress.Report(new PipelineProgress(60, $"BGM適用: {Path.GetFileName(settings.BgmFilePath)} (音量: {settings.BgmVolume * 100:F0}%)", true));
+                            bgmReader = new AudioFileReader(settings.BgmFilePath!);
+                            ISampleProvider bgmProvider = bgmReader;
+                            if (bgmProvider.WaveFormat.Channels == 1)
+                                bgmProvider = new NAudio.Wave.SampleProviders.MonoToStereoSampleProvider(bgmProvider);
+                            if (bgmProvider.WaveFormat.SampleRate != 48000)
+                                bgmProvider = new NAudio.Wave.SampleProviders.WdlResamplingSampleProvider(bgmProvider, 48000);
+
+                            // BGMフェードアウト設定: 本編終了の10秒前から5秒間でフェードアウト（5秒前でゲイン0）
+                            long fadeOutStart = Math.Max(0, mainVoiceFrames - (48000 * 10));
+                            long fadeOutDuration = 48000 * 5; // 5秒間
+
+                            bgmTrack = new MixingTrack(bgmProvider)
+                            {
+                                Volume = (float)settings.BgmVolume,
+                                StartFrame = 0,
+                                StopFrame = fadeOutStart + fadeOutDuration,
+                                FadeOutStartFrame = fadeOutStart,
+                                FadeOutDurationFrames = fadeOutDuration,
+                                Loop = true,
+                                OnLoopReset = () => { bgmReader.Position = 0; }
+                            };
+                        }
+
+                        MixingTrack? endingTrack = null;
+                        AudioFileReader? endingReader = null;
+                        long totalMixFrames = mainVoiceFrames;
+
+                        if (hasEnding)
+                        {
+                            progress.Report(new PipelineProgress(62, $"エンディング曲適用: {Path.GetFileName(settings.EndingFilePath)} (音量: {settings.EndingVolume * 100:F0}%)", true));
+                            endingReader = new AudioFileReader(settings.EndingFilePath!);
+                            ISampleProvider edProvider = endingReader;
+                            if (edProvider.WaveFormat.Channels == 1)
+                                edProvider = new NAudio.Wave.SampleProviders.MonoToStereoSampleProvider(edProvider);
+                            if (edProvider.WaveFormat.SampleRate != 48000)
+                                edProvider = new NAudio.Wave.SampleProviders.WdlResamplingSampleProvider(edProvider, 48000);
+
+                            // エンディング曲設定: 本編終了の5秒前から5秒間フェードイン（本編終了地点で100%に到達）
+                            long fadeInStart = Math.Max(0, mainVoiceFrames - (48000 * 5));
+                            long fadeInDuration = 48000 * 5; // 5秒間
+
+                            // 本編終了後の余韻時間
+                            long extraFrames = (long)(Math.Max(0, settings.EndingExtraSeconds) * 48000);
+                            long stopFrame = mainVoiceFrames + extraFrames;
+                            totalMixFrames = Math.Max(totalMixFrames, stopFrame);
+
+                            long fadeOutDuration = Math.Min(48000 * 5, extraFrames); // 終了直前最大5秒フェードアウト
+                            long fadeOutStart = stopFrame - fadeOutDuration;
+
+                            endingTrack = new MixingTrack(edProvider)
+                            {
+                                Volume = (float)settings.EndingVolume,
+                                StartFrame = fadeInStart,
+                                StopFrame = stopFrame,
+                                FadeInStartFrame = fadeInStart,
+                                FadeInDurationFrames = fadeInDuration,
+                                FadeOutStartFrame = fadeOutStart,
+                                FadeOutDurationFrames = fadeOutDuration
+                            };
+                        }
+
+                        // タイムラインミキサー生成
+                        var mixer = new TimelineMixingSampleProvider(
+                            voiceReader,
+                            mainVoiceFrames,
+                            bgmTrack,
+                            endingTrack,
+                            totalMixFrames);
+
+                        // MP3エンコード
+                        progress.Report(new PipelineProgress(65, $"最終MP3書き出し: {settings.Mp3Bitrate} kbps -> {Path.GetFileName(outputFilePath)}", true));
+                        var mixedPcm = mixer.ToWaveProvider16();
+
+                        using (var mp3Writer = new LameMP3FileWriter(outputFilePath, mixedPcm.WaveFormat, settings.Mp3Bitrate))
+                        {
+                            byte[] buffer = new byte[32768];
+                            long framesWritten = 0;
+                            DateTime lastReportTime = DateTime.UtcNow;
+
+                            while (true)
+                            {
+                                cancellationToken.ThrowIfCancellationRequested();
+                                int bytesRead = mixedPcm.Read(buffer.AsSpan());
+                                if (bytesRead == 0) break;
+
+                                mp3Writer.Write(buffer, 0, bytesRead);
+                                framesWritten += bytesRead / mixedPcm.WaveFormat.BlockAlign;
+
+                                double ratio = totalMixFrames > 0 ? Math.Clamp((double)framesWritten / totalMixFrames, 0.0, 1.0) : 0.0;
+                                double pct = 65.0 + (ratio * 30.0); // 65% 〜 95%
+
+                                if ((DateTime.UtcNow - lastReportTime).TotalMilliseconds >= 250)
+                                {
+                                    progress.Report(new PipelineProgress(pct, $"ミックス・MP3エンコード中... ({pct:F0}%)", false));
+                                    lastReportTime = DateTime.UtcNow;
+                                }
+                            }
+                        }
+
+                        bgmReader?.Dispose();
+                        endingReader?.Dispose();
+                    }
+                    finally
+                    {
+                        if (File.Exists(tempVoiceWav))
+                        {
+                            try { File.Delete(tempVoiceWav); } catch { }
+                        }
+                    }
+                }
+                else
+                {
+                    // 【1パス直接エンコード方式（BGM・EDなしの標準処理）】
+                    progress.Report(new PipelineProgress(25, $"MP3エンコード準備: {settings.Mp3Bitrate} kbps -> {Path.GetFileName(outputFilePath)}", true));
+
+                    var pcmProvider = currentProvider.ToWaveProvider16();
+                    using (var writer = new LameMP3FileWriter(outputFilePath, pcmProvider.WaveFormat, settings.Mp3Bitrate))
+                    {
+                        byte[] buffer = new byte[32768];
+                        DateTime lastReportTime = DateTime.UtcNow;
+                        int lastReportedMilestone = 25;
+
+                        while (true)
+                        {
+                            cancellationToken.ThrowIfCancellationRequested();
+
+                            int bytesRead = pcmProvider.Read(buffer.AsSpan());
+                            if (bytesRead == 0) break;
+
+                            writer.Write(buffer, 0, bytesRead);
+
+                            double ratio = reader.Length > 0 ? Math.Clamp((double)reader.Position / reader.Length, 0.0, 1.0) : 0.0;
+                            double percent = 25.0 + (ratio * 70.0);
+
+                            if ((DateTime.UtcNow - lastReportTime).TotalMilliseconds >= 250)
+                            {
+                                progress.Report(new PipelineProgress(percent, $"エンコード中... ({percent:F0}%)", false));
+                                lastReportTime = DateTime.UtcNow;
+                            }
+
+                            int milestone = ((int)percent / 25) * 25;
+                            if (milestone > lastReportedMilestone && milestone < 95)
+                            {
+                                progress.Report(new PipelineProgress(percent, $"音声処理・エンコード進行中: {milestone}% 完了", true));
+                                lastReportedMilestone = milestone;
+                            }
                         }
                     }
                 }
