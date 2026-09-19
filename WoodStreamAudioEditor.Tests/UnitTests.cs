@@ -45,9 +45,24 @@ public class UnitTests
             DefaultArtist = "木澤 朋和（テスト）",
             DefaultAlbum = "WoodStreamのデジタル生活（テスト）",
             DefaultTitle = "第999回 マイクロソフトの最新技術",
+            DefaultTrackNumber = "999",
             Mp3Bitrate = 256,
             SilenceThresholdDb = -42.5,
-            MinSilenceDurationMs = 350
+            MinSilenceDurationMs = 350,
+            EnableTrim = true,
+            TrimStartSeconds = 3.2,
+            TrimEndSeconds = 4.5,
+            EnableBgm = true,
+            BgmFilePath = @"C:\Music\bgm.mp3",
+            BgmVolume = 0.18,
+            EnableEnding = true,
+            EndingFilePath = @"C:\Music\ending.wav",
+            EndingVolume = 0.75,
+            WindowLeft = 120,
+            WindowTop = 80,
+            WindowWidth = 1050,
+            WindowHeight = 820,
+            IsMaximized = false
         };
 
         service.Save(testSettings);
@@ -56,9 +71,24 @@ public class UnitTests
         Assert.AreEqual(testSettings.DefaultArtist, loaded.DefaultArtist);
         Assert.AreEqual(testSettings.DefaultAlbum, loaded.DefaultAlbum);
         Assert.AreEqual(testSettings.DefaultTitle, loaded.DefaultTitle);
+        Assert.AreEqual(testSettings.DefaultTrackNumber, loaded.DefaultTrackNumber);
         Assert.AreEqual(256, loaded.Mp3Bitrate);
         Assert.AreEqual(-42.5, loaded.SilenceThresholdDb);
         Assert.AreEqual(350, loaded.MinSilenceDurationMs);
+        Assert.AreEqual(true, loaded.EnableTrim);
+        Assert.AreEqual(3.2, loaded.TrimStartSeconds);
+        Assert.AreEqual(4.5, loaded.TrimEndSeconds);
+        Assert.AreEqual(true, loaded.EnableBgm);
+        Assert.AreEqual(@"C:\Music\bgm.mp3", loaded.BgmFilePath);
+        Assert.AreEqual(0.18, loaded.BgmVolume);
+        Assert.AreEqual(true, loaded.EnableEnding);
+        Assert.AreEqual(@"C:\Music\ending.wav", loaded.EndingFilePath);
+        Assert.AreEqual(0.75, loaded.EndingVolume);
+        Assert.AreEqual(120, loaded.WindowLeft);
+        Assert.AreEqual(80, loaded.WindowTop);
+        Assert.AreEqual(1050, loaded.WindowWidth);
+        Assert.AreEqual(820, loaded.WindowHeight);
+        Assert.AreEqual(false, loaded.IsMaximized);
 
         // ファイル内容を直接読み取って Unicode エスケープ (\uXXXX) されていないことを検証
         string appDataPath = Path.Combine(

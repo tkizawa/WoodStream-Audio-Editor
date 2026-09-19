@@ -608,12 +608,23 @@ public partial class MainViewModel : ObservableObject
         EndingVolume = settings.EndingVolume > 0 ? settings.EndingVolume : 0.80;
         EndingExtraSeconds = settings.EndingExtraSeconds >= 0 ? settings.EndingExtraSeconds : 15.0;
 
+        if (!string.IsNullOrWhiteSpace(settings.DefaultTrackNumber))
+        {
+            TagTrackNumber = settings.DefaultTrackNumber;
+        }
+
         TagArtist = settings.DefaultArtist;
         TagAlbum = settings.DefaultAlbum;
         TagArtworkPath = settings.DefaultArtworkPath;
         if (!string.IsNullOrWhiteSpace(settings.DefaultTitle))
         {
             TagTitle = settings.DefaultTitle;
+        }
+
+        // 前回入力ファイルが存在する場合は音声情報（長さ・予想時間）も含めて完全復元
+        if (!string.IsNullOrWhiteSpace(settings.LastInputFilePath) && File.Exists(settings.LastInputFilePath))
+        {
+            SetInputFile(settings.LastInputFilePath);
         }
 
         // 以前のバージョンで iZRX8De-click.dll (エンジンDLL) が保存されている場合、正規の VST2 プラグインに補正
@@ -663,6 +674,7 @@ public partial class MainViewModel : ObservableObject
             DefaultTitle = TagTitle,
             DefaultArtist = TagArtist,
             DefaultAlbum = TagAlbum,
+            DefaultTrackNumber = TagTrackNumber,
             DefaultArtworkPath = TagArtworkPath
         };
     }
@@ -673,6 +685,11 @@ public partial class MainViewModel : ObservableObject
         if (window.WindowState == WindowState.Maximized)
         {
             settings.IsMaximized = true;
+            // 最大化時でも通常のウィンドウ位置・サイズを RestoreBounds から退避保存
+            settings.WindowLeft = window.RestoreBounds.Left;
+            settings.WindowTop = window.RestoreBounds.Top;
+            settings.WindowWidth = window.RestoreBounds.Width;
+            settings.WindowHeight = window.RestoreBounds.Height;
         }
         else
         {

@@ -18,14 +18,14 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
-        Loaded += MainWindow_Loaded;
+        SourceInitialized += MainWindow_SourceInitialized;
         Closing += MainWindow_Closing;
     }
 
     /// <summary>
-    /// 起動時: 保存されたウィンドウ位置・サイズを復元
+    /// 起動時: ウィンドウハンドル初期化時に保存されたウィンドウ位置・サイズ・状態を復元
     /// </summary>
-    private void MainWindow_Loaded(object sender, RoutedEventArgs e)
+    private void MainWindow_SourceInitialized(object? sender, EventArgs e)
     {
         try
         {
@@ -34,13 +34,22 @@ public partial class MainWindow : Window
             // 位置とサイズが有効か確認
             if (settings.WindowLeft.HasValue && settings.WindowTop.HasValue &&
                 !double.IsNaN(settings.WindowLeft.Value) && !double.IsNaN(settings.WindowTop.Value) &&
-                settings.WindowWidth > 200 && settings.WindowHeight > 200)
+                settings.WindowWidth >= 400 && settings.WindowHeight >= 300)
             {
-                // スクリーン領域内に収まっているか安全策チェック
-                if (settings.WindowLeft.Value >= SystemParameters.VirtualScreenLeft &&
-                    settings.WindowLeft.Value + settings.WindowWidth <= SystemParameters.VirtualScreenLeft + SystemParameters.VirtualScreenWidth &&
-                    settings.WindowTop.Value >= SystemParameters.VirtualScreenTop &&
-                    settings.WindowTop.Value + settings.WindowHeight <= SystemParameters.VirtualScreenTop + SystemParameters.VirtualScreenHeight)
+                // 仮想スクリーン領域（全モニター領域）と交差しているかを判定
+                var virtualScreenRect = new Rect(
+                    SystemParameters.VirtualScreenLeft,
+                    SystemParameters.VirtualScreenTop,
+                    SystemParameters.VirtualScreenWidth,
+                    SystemParameters.VirtualScreenHeight);
+
+                var windowRect = new Rect(
+                    settings.WindowLeft.Value,
+                    settings.WindowTop.Value,
+                    settings.WindowWidth,
+                    settings.WindowHeight);
+
+                if (virtualScreenRect.IntersectsWith(windowRect))
                 {
                     Left = settings.WindowLeft.Value;
                     Top = settings.WindowTop.Value;
