@@ -64,6 +64,31 @@ public class AudioPipelineService
                 currentProvider = new NAudio.Wave.SampleProviders.WdlResamplingSampleProvider(currentProvider, targetSampleRate);
             }
 
+            // 1.5. トリミング（先頭・末尾カット）の適用
+            if (settings.EnableTrim && (settings.TrimStartSeconds > 0 || settings.TrimEndSeconds > 0))
+            {
+                double startSec = Math.Max(0, settings.TrimStartSeconds);
+                double endSec = Math.Max(0, settings.TrimEndSeconds);
+                double totalSec = originalTotalTime.TotalSeconds;
+
+                if (startSec + endSec >= totalSec)
+                {
+                    progress.Report(new PipelineProgress(6, $"[警告] カット秒数の合計 ({startSec + endSec:F1}秒) が音声の長さ ({totalSec:F1}秒) を超えているため、トリミングをスキップします。", true));
+                }
+                else
+                {
+                    double remainingSec = totalSec - startSec - endSec;
+                    progress.Report(new PipelineProgress(6, $"トリミング適用: 先頭 {startSec:F1}秒カット, 末尾 {endSec:F1}秒カット (有効時間: {TimeSpan.FromSeconds(remainingSec):mm\\:ss})", true));
+
+                    if (startSec > 0)
+                    {
+                        reader.CurrentTime = TimeSpan.FromSeconds(startSec);
+                    }
+
+                    currentProvider = new TrimSampleProvider(currentProvider, TimeSpan.FromSeconds(remainingSec));
+                }
+            }
+
             VstSampleProvider? deClickVst = null;
             VstSampleProvider? deNoiseVst = null;
 

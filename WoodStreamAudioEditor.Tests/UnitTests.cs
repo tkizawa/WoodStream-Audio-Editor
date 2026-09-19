@@ -381,14 +381,108 @@ public class UnitTests
             System.Threading.CancellationToken.None);
 
         Assert.IsTrue(File.Exists(outputMp3), "出力MP3ファイルが存在すること");
+    }
 
-        // MP3 を WAV にデコードして出力波形を保存
-        string outWav = @"D:\Dev\WoodStream Audio Editor\analyzed_output.wav";
-        using (var reader = new Mp3FileReader(outputMp3))
+    /// <summary>
+    /// TrimSampleProvider の切り出し時間およびフェードイン/アウトの単体検証
+    /// </summary>
+    [TestMethod]
+    public void TestTrimSampleProvider()
+    {
+        int sampleRate = 48000;
+        int channels = 1;
+        var format = WaveFormat.CreateIeeeFloatWaveFormat(sampleRate, channels);
+
+        // 5秒のテスト音声 (振幅 1.0 の一定信号)
+        float[] sourceSamples = new float[sampleRate * 5];
+        Array.Fill(sourceSamples, 1.0f);
+
+        var sourceProvider = new TestArraySampleProvider(format, sourceSamples);
+
+        // 2.0秒分を切り出し
+        var trimProvider = new TrimSampleProvider(sourceProvider, TimeSpan.FromSeconds(2.0));
+
+        float[] readBuffer = new float[1024];
+        var allReadSamples = new System.Collections.Generic.List<float>();
+
+        while (true)
         {
-            WaveFileWriter.CreateWaveFile(outWav, reader);
+            int read = trimProvider.Read(readBuffer.AsSpan());
+            if (read == 0) break;
+            for (int i = 0; i < read; i++)
+            {
+                allReadSamples.Add(readBuffer[i]);
+            }
         }
-        Console.WriteLine("Saved analyzed_output.wav for analysis");
+
+        // 2.0秒 = 96,000 サンプル
+        Assert.AreEqual(sampleRate * 2, allReadSamples.Count, "指定した2.0秒分のサンプル数が読み出されること");
+
+        // 先頭サンプルがフェードインにより 1.0 より小さいこと (0.0 から立ち上がる)
+        Assert.IsTrue(allReadSamples[0] < 0.1f, "先頭サンプルがフェードイン処理されていること");
+
+        // 末尾サンプルがフェードアウトにより 1.0 より小さいこと (0.0 に収束する)
+        Assert.IsTrue(allReadSamples[^1] < 0.1f, "末尾サンプルがフェードアウト処理されていること");
+
+        // 中間サンプルはフェードの影響を受けず 1.0f であること
+        Assert.AreEqual(1.0f, allReadSamples[sampleRate], 0.001f, "中間サンプルは減衰しないこと");
+    }
+
+    /// <summary>
+    /// パイプラインでのトリミング（先頭・末尾カット）の統合検証
+    /// </summary>
+    [TestMethod]
+    public async Task TestAudioPipelineWithTrimming()
+    {
+        int sampleRate = 44100;
+        int channels = 2;
+        string inputWav = Path.Combine(_tempDir, "trim_test_input.wav");
+
+        // 6秒のテストWAVを作成
+        var format = new WaveFormat(sampleRate, 16, channels);
+        using (var writer = new WaveFileWriter(inputWav, format))
+        {
+            byte[] buffer = new byte[format.AverageBytesPerSecond * 6];
+            for (int i = 0; i < sampleRate * 6; i++)
+            {
+                short sample = (short)(Math.Sin(2 * Math.PI * 440 * i / sampleRate) * 16000);
+                byte b1 = (byte)(sample & 0xFF);
+                byte b2 = (byte)((sample >> 8) & 0xFF);
+                int idx = i * 4;
+                buffer[idx] = b1;
+                buffer[idx + 1] = b2;
+                buffer[idx + 2] = b1;
+                buffer[idx + 3] = b2;
+            }
+            writer.Write(buffer, 0, buffer.Length);
+        }
+
+        var pipelineService = new AudioPipelineService();
+        var settings = new AppSettings
+        {
+            EnableDeClick = false,
+            EnableVoiceDeNoise = false,
+            EnableSilenceTruncation = false, // トリミング時間のみを純粋に検証するため無音カットはOFF
+            EnableTrim = true,
+            TrimStartSeconds = 1.5, // 先頭1.5秒カット
+            TrimEndSeconds = 1.5,   // 末尾1.5秒カット
+            Mp3Bitrate = 192
+        };
+
+        var progress = new Progress<PipelineProgress>(_ => { });
+        string outputMp3 = await pipelineService.ProcessAudioAsync(
+            inputWav,
+            _tempDir,
+            settings,
+            progress,
+            System.Threading.CancellationToken.None);
+
+        Assert.IsTrue(File.Exists(outputMp3), "出力MP3ファイルが存在すること");
+
+        // 6.0秒から先頭1.5秒・末尾1.5秒をカットしたので、約3.0秒になっていること
+        using var mp3 = new Mp3FileReader(outputMp3);
+        double duration = mp3.TotalTime.TotalSeconds;
+        Assert.IsTrue(Math.Abs(duration - 3.0) < 0.3, $"再生時間が約3.0秒であること (実際: {duration:F2}秒)");
     }
 
     private static byte[] CreateMinimalPng()

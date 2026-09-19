@@ -28,6 +28,11 @@ public class AppSettings
     public string VoiceDeNoisePluginPath { get; set; } = string.Empty;
     public bool EnableVoiceDeNoise { get; set; } = true;
 
+    // トリミング（先頭・末尾カット）設定
+    public bool EnableTrim { get; set; } = false;
+    public double TrimStartSeconds { get; set; } = 0.0; // 秒
+    public double TrimEndSeconds { get; set; } = 0.0;   // 秒
+
     // 無音削除設定
     public bool EnableSilenceTruncation { get; set; } = true;
     public double SilenceThresholdDb { get; set; } = -45.0; // dB

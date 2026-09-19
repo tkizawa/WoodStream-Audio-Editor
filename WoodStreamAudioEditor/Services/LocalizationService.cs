@@ -82,7 +82,16 @@ public class LocalizationService : INotifyPropertyChanged
         ? "※ 64bit(x64)の VST 2.4 プラグイン (.dll) を指定してください。" 
         : "* Please specify 64-bit (x64) VST 2.4 plugin (.dll) files.";
 
-    // 音声処理
+    // 音声処理・トリミング
+    public string SectionTrim => IsJapanese ? "トリミング設定 (最初・最後のカット)" : "Trimming (Start & End Cut)";
+    public string EnableTrim => IsJapanese ? "最初と最後の不要部分をカットする" : "Enable Start & End Cut";
+    public string TrimStart => IsJapanese ? "先頭カット時間 (秒):" : "Trim Start (sec):";
+    public string TrimStartHint => IsJapanese ? "（録音開始時の準備音や間をカット）" : "(Cut seconds from start)";
+    public string TrimEnd => IsJapanese ? "末尾カット時間 (秒):" : "Trim End (sec):";
+    public string TrimEndHint => IsJapanese ? "（録音終了後の不要な間やノイズをカット）" : "(Cut seconds from end)";
+    public string AudioDuration => IsJapanese ? "元の音声の長さ:" : "Audio Duration:";
+    public string EstimatedDuration => IsJapanese ? "カット後の予想の長さ:" : "Est. Duration:";
+
     public string EnableSilenceTruncation => IsJapanese ? "無音部分の自動カット (Silence Truncation) を有効にする" : "Enable Silence Truncation";
     public string SilenceThreshold => IsJapanese ? "無音判定音量閾値 (dB):" : "Silence Volume Threshold (dB):";
     public string SilenceThresholdHint => IsJapanese ? "（推奨: -45dB 〜 -40dB。環境音と音声の境目）" : "(Recommended: -45dB to -40dB)";

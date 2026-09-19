@@ -8,6 +8,7 @@ using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Win32;
+using NAudio.Wave;
 using WoodStreamAudioEditor.Models;
 using WoodStreamAudioEditor.Services;
 using WoodStreamAudioEditor.Services.Audio;
@@ -73,8 +74,43 @@ public partial class MainViewModel : ObservableObject
     private bool _enableVoiceDeNoise = true;
 
     // ==========================================
-    // 3. 音声処理・無音自動カット設定
+    // 3. 音声処理・トリミング・無音自動カット設定
     // ==========================================
+    [ObservableProperty]
+    private bool _enableTrim = false;
+
+    [ObservableProperty]
+    private double _trimStartSeconds = 0.0;
+
+    [ObservableProperty]
+    private double _trimEndSeconds = 0.0;
+
+    [ObservableProperty]
+    private double _audioTotalSeconds = 0.0;
+
+    [ObservableProperty]
+    private string _audioDurationDisplay = string.Empty;
+
+    [ObservableProperty]
+    private string _estimatedDurationDisplay = string.Empty;
+
+    partial void OnEnableTrimChanged(bool value) => UpdateEstimatedDuration();
+    partial void OnTrimStartSecondsChanged(double value) => UpdateEstimatedDuration();
+    partial void OnTrimEndSecondsChanged(double value) => UpdateEstimatedDuration();
+
+    private void UpdateEstimatedDuration()
+    {
+        if (AudioTotalSeconds <= 0)
+        {
+            EstimatedDurationDisplay = string.Empty;
+            return;
+        }
+
+        double cut = EnableTrim ? (TrimStartSeconds + TrimEndSeconds) : 0;
+        double remaining = Math.Max(0, AudioTotalSeconds - cut);
+        EstimatedDurationDisplay = $"{TimeSpan.FromSeconds(remaining):mm\\:ss} ({remaining:F1}s)";
+    }
+
     [ObservableProperty]
     private bool _enableSilenceTruncation = true;
 
@@ -171,6 +207,24 @@ public partial class MainViewModel : ObservableObject
         if (string.IsNullOrWhiteSpace(TagTitle))
         {
             TagTitle = Path.GetFileNameWithoutExtension(filePath);
+        }
+
+        // 音声ファイル長を取得
+        try
+        {
+            if (File.Exists(filePath))
+            {
+                using var reader = new AudioFileReader(filePath);
+                AudioTotalSeconds = reader.TotalTime.TotalSeconds;
+                AudioDurationDisplay = $"{reader.TotalTime:mm\\:ss} ({AudioTotalSeconds:F1}s)";
+                UpdateEstimatedDuration();
+            }
+        }
+        catch
+        {
+            AudioTotalSeconds = 0;
+            AudioDurationDisplay = string.Empty;
+            EstimatedDurationDisplay = string.Empty;
         }
     }
 
@@ -457,6 +511,10 @@ public partial class MainViewModel : ObservableObject
         VoiceDeNoisePluginPath = settings.VoiceDeNoisePluginPath;
         EnableVoiceDeNoise = settings.EnableVoiceDeNoise;
 
+        EnableTrim = settings.EnableTrim;
+        TrimStartSeconds = settings.TrimStartSeconds;
+        TrimEndSeconds = settings.TrimEndSeconds;
+
         EnableSilenceTruncation = settings.EnableSilenceTruncation;
         SilenceThresholdDb = settings.SilenceThresholdDb;
         MinSilenceDurationMs = settings.MinSilenceDurationMs;
@@ -501,6 +559,9 @@ public partial class MainViewModel : ObservableObject
             EnableDeClick = EnableDeClick,
             VoiceDeNoisePluginPath = VoiceDeNoisePluginPath,
             EnableVoiceDeNoise = EnableVoiceDeNoise,
+            EnableTrim = EnableTrim,
+            TrimStartSeconds = TrimStartSeconds,
+            TrimEndSeconds = TrimEndSeconds,
             EnableSilenceTruncation = EnableSilenceTruncation,
             SilenceThresholdDb = SilenceThresholdDb,
             MinSilenceDurationMs = MinSilenceDurationMs,

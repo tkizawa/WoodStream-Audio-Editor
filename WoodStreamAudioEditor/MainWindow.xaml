@@ -157,6 +157,65 @@
                         <StackPanel>
                             <TextBlock Text="{Binding Strings.SectionAudioProcessing}" FontSize="15" FontWeight="SemiBold" Foreground="{DynamicResource AccentCyanBrush}" Margin="0,0,0,10" />
 
+                            <!-- Audio Duration Display (if file selected) -->
+                            <Border Background="{DynamicResource InputBgBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="4" Padding="10,6" Margin="0,0,0,12">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="{Binding Strings.AudioDuration}" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,6,0" />
+                                        <TextBlock Text="{Binding AudioDurationDisplay, TargetNullValue='--:--'}" FontWeight="SemiBold" Foreground="{DynamicResource AccentCyanBrush}" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                        <TextBlock Text="{Binding Strings.EstimatedDuration}" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,6,0" />
+                                        <TextBlock Text="{Binding EstimatedDurationDisplay, TargetNullValue='--:--'}" FontWeight="Bold" Foreground="{DynamicResource TextPrimaryBrush}" />
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+
+                            <!-- Trim Settings (Start & End Cut) -->
+                            <CheckBox IsChecked="{Binding EnableTrim}" Content="{Binding Strings.EnableTrim}" FontWeight="SemiBold" Margin="0,0,0,8" />
+
+                            <StackPanel IsEnabled="{Binding EnableTrim}" Margin="0,0,0,8">
+                                <!-- Trim Start Slider -->
+                                <Grid Margin="0,0,0,4">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="{Binding Strings.TrimStart}" />
+                                        <TextBlock Text="{Binding Strings.TrimStartHint}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11" Margin="6,0,0,0" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                        <TextBox Text="{Binding TrimStartSeconds, StringFormat='{}{0:F1}', UpdateSourceTrigger=PropertyChanged}" Width="52" Height="24" TextAlignment="Right" VerticalContentAlignment="Center" Margin="0,0,4,0" />
+                                        <TextBlock Text="秒" VerticalAlignment="Center" Foreground="{DynamicResource AccentCyanBrush}" FontWeight="Bold" />
+                                    </StackPanel>
+                                </Grid>
+                                <Slider Minimum="0" Maximum="120" TickFrequency="1" Value="{Binding TrimStartSeconds}" Margin="0,0,0,10" />
+
+                                <!-- Trim End Slider -->
+                                <Grid Margin="0,0,0,4">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="{Binding Strings.TrimEnd}" />
+                                        <TextBlock Text="{Binding Strings.TrimEndHint}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11" Margin="6,0,0,0" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                        <TextBox Text="{Binding TrimEndSeconds, StringFormat='{}{0:F1}', UpdateSourceTrigger=PropertyChanged}" Width="52" Height="24" TextAlignment="Right" VerticalContentAlignment="Center" Margin="0,0,4,0" />
+                                        <TextBlock Text="秒" VerticalAlignment="Center" Foreground="{DynamicResource AccentCyanBrush}" FontWeight="Bold" />
+                                    </StackPanel>
+                                </Grid>
+                                <Slider Minimum="0" Maximum="120" TickFrequency="1" Value="{Binding TrimEndSeconds}" Margin="0,0,0,10" />
+                            </StackPanel>
+
+                            <Separator Background="{DynamicResource CardBorderBrush}" Margin="0,4,0,12" />
+
                             <!-- Silence Truncation Checkbox -->
                             <CheckBox IsChecked="{Binding EnableSilenceTruncation}" Content="{Binding Strings.EnableSilenceTruncation}" FontWeight="SemiBold" Margin="0,0,0,10" />
 
