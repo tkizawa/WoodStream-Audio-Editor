@@ -9,7 +9,7 @@
         Icon="Resources/app.ico"
         Height="820" Width="1080"
         MinHeight="700" MinWidth="900"
-        Background="{StaticResource BgDarkBrush}"
+        Background="{DynamicResource BgDarkBrush}"
         WindowStartupLocation="CenterScreen"
         AllowDrop="True"
         Drop="Window_Drop"
@@ -32,7 +32,7 @@
         <!-- ==========================================
              Header Bar
              ========================================== -->
-        <Border Grid.Row="0" Background="{StaticResource CardBgBrush}" BorderBrush="{StaticResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="14,10" Margin="0,0,0,12">
+        <Border Grid.Row="0" Background="{DynamicResource CardBgBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="14,10" Margin="0,0,0,12">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
@@ -43,20 +43,20 @@
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                     <Image Source="Resources/app.png" Width="34" Height="34" Margin="0,0,12,0" />
                     <StackPanel VerticalAlignment="Center">
-                        <TextBlock Text="WoodStream Audio Editor" FontSize="18" FontWeight="Bold" Foreground="{StaticResource AccentCyanBrush}" />
-                        <TextBlock Text="Podcast Master Processor &amp; ID3 Tagger" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" />
+                        <TextBlock Text="WoodStream Audio Editor" FontSize="18" FontWeight="Bold" Foreground="{DynamicResource AccentCyanBrush}" />
+                        <TextBlock Text="Podcast Master Processor &amp; ID3 Tagger" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" />
                     </StackPanel>
                 </StackPanel>
 
                 <!-- Top Right: Language Selector & Save Defaults -->
                 <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                    <TextBlock Text="{Binding Strings.LanguageLabel}" VerticalAlignment="Center" Margin="0,0,8,0" Foreground="{StaticResource TextSecondaryBrush}" />
-                    <ComboBox SelectedValue="{Binding SelectedLanguage, Mode=TwoWay}" SelectedValuePath="Tag" Width="110" Height="28" Margin="0,0,12,0" VerticalContentAlignment="Center">
+                    <TextBlock Text="{Binding Strings.LanguageLabel}" VerticalAlignment="Center" Margin="0,0,8,0" Foreground="{DynamicResource TextSecondaryBrush}" />
+                    <ComboBox SelectedValue="{Binding SelectedLanguage, Mode=TwoWay}" SelectedValuePath="Tag" Width="125" Height="28" Margin="0,0,12,0" VerticalContentAlignment="Center">
                         <ComboBoxItem Content="Auto (System)" Tag="Auto" />
                         <ComboBoxItem Content="日本語" Tag="ja-JP" />
                         <ComboBoxItem Content="English" Tag="en-US" />
                     </ComboBox>
-                    <Button Style="{StaticResource SecondaryButton}" Command="{Binding SaveDefaultsCommand}" ToolTip="{Binding Strings.SaveDefaults}" Padding="10,4">
+                    <Button Style="{DynamicResource SecondaryButton}" Command="{Binding SaveDefaultsCommand}" ToolTip="{Binding Strings.SaveDefaults}" Padding="10,4">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="💾 " />
                             <TextBlock Text="{Binding Strings.SaveDefaults}" />
@@ -81,9 +81,9 @@
             <ScrollViewer Grid.Column="0" VerticalScrollBarVisibility="Auto" Margin="0,0,8,0">
                 <StackPanel>
                     <!-- 1. File Input / Output Panel -->
-                    <Border Background="{StaticResource CardBgBrush}" BorderBrush="{StaticResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="14" Margin="0,0,0,12">
+                    <Border Background="{DynamicResource CardBgBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="14" Margin="0,0,0,12">
                         <StackPanel>
-                            <TextBlock Text="{Binding Strings.SectionInputOutput}" FontSize="15" FontWeight="SemiBold" Foreground="{StaticResource AccentCyanBrush}" Margin="0,0,0,10" />
+                            <TextBlock Text="{Binding Strings.SectionInputOutput}" FontSize="15" FontWeight="SemiBold" Foreground="{DynamicResource AccentCyanBrush}" Margin="0,0,0,10" />
 
                             <!-- Input File -->
                             <TextBlock Text="{Binding Strings.InputFile}" Margin="0,0,0,4" />
@@ -97,8 +97,8 @@
                             </Grid>
 
                             <!-- Drop Target Visual Area -->
-                            <Border BorderBrush="{StaticResource CardBorderBrush}" BorderThickness="1" CornerRadius="6" Padding="8" Margin="0,2,0,10" Background="#141820">
-                                <TextBlock Text="{Binding Strings.DragDropHint}" HorizontalAlignment="Center" Foreground="{StaticResource TextSecondaryBrush}" FontSize="11" />
+                            <Border BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="6" Padding="8" Margin="0,2,0,10" Background="{DynamicResource DropAreaBgBrush}">
+                                <TextBlock Text="{Binding Strings.DragDropHint}" HorizontalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11" />
                             </Border>
 
                             <!-- Output Directory -->
@@ -109,24 +109,24 @@
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
                                 <TextBox Text="{Binding OutputDirectoryPath, UpdateSourceTrigger=PropertyChanged}" Height="28" />
-                                <Button Grid.Column="1" Command="{Binding BrowseOutputDirectoryCommand}" Content="{Binding Strings.Browse}" Margin="6,0,0,0" Width="75" Style="{StaticResource SecondaryButton}" />
+                                <Button Grid.Column="1" Command="{Binding BrowseOutputDirectoryCommand}" Content="{Binding Strings.Browse}" Margin="6,0,0,0" Width="75" Style="{DynamicResource SecondaryButton}" />
                             </Grid>
                         </StackPanel>
                     </Border>
 
                     <!-- 2. VST Plugin Processing Panel -->
-                    <Border Background="{StaticResource CardBgBrush}" BorderBrush="{StaticResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="14" Margin="0,0,0,12">
+                    <Border Background="{DynamicResource CardBgBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="14" Margin="0,0,0,12">
                         <StackPanel>
                             <Grid Margin="0,0,0,10">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
-                                <TextBlock Text="{Binding Strings.SectionVst}" FontSize="15" FontWeight="SemiBold" Foreground="{StaticResource AccentCyanBrush}" VerticalAlignment="Center" />
-                                <Button Grid.Column="1" Command="{Binding AutoDetectPluginsCommand}" Content="{Binding Strings.AutoDetect}" Style="{StaticResource SecondaryButton}" Padding="8,3" FontSize="11" />
+                                <TextBlock Text="{Binding Strings.SectionVst}" FontSize="15" FontWeight="SemiBold" Foreground="{DynamicResource AccentCyanBrush}" VerticalAlignment="Center" />
+                                <Button Grid.Column="1" Command="{Binding AutoDetectPluginsCommand}" Content="{Binding Strings.AutoDetect}" Style="{DynamicResource SecondaryButton}" Padding="8,3" FontSize="11" />
                             </Grid>
 
-                            <TextBlock Text="{Binding Strings.VstNotice}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="11" Margin="0,0,0,8" />
+                            <TextBlock Text="{Binding Strings.VstNotice}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11" Margin="0,0,0,8" />
 
                             <!-- De-click -->
                             <CheckBox IsChecked="{Binding EnableDeClick}" Content="{Binding Strings.EnableDeClick}" FontWeight="SemiBold" Margin="0,0,0,4" />
@@ -136,7 +136,7 @@
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
                                 <TextBox Text="{Binding DeClickPluginPath, UpdateSourceTrigger=PropertyChanged}" Height="28" ToolTip="{Binding Strings.DeClickLabel}" />
-                                <Button Grid.Column="1" Command="{Binding BrowseDeClickPluginCommand}" Content="{Binding Strings.Browse}" Margin="6,0,0,0" Width="75" Style="{StaticResource SecondaryButton}" />
+                                <Button Grid.Column="1" Command="{Binding BrowseDeClickPluginCommand}" Content="{Binding Strings.Browse}" Margin="6,0,0,0" Width="75" Style="{DynamicResource SecondaryButton}" />
                             </Grid>
 
                             <!-- Voice De-noise -->
@@ -147,15 +147,15 @@
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
                                 <TextBox Text="{Binding VoiceDeNoisePluginPath, UpdateSourceTrigger=PropertyChanged}" Height="28" ToolTip="{Binding Strings.VoiceDeNoiseLabel}" />
-                                <Button Grid.Column="1" Command="{Binding BrowseVoiceDeNoisePluginCommand}" Content="{Binding Strings.Browse}" Margin="6,0,0,0" Width="75" Style="{StaticResource SecondaryButton}" />
+                                <Button Grid.Column="1" Command="{Binding BrowseVoiceDeNoisePluginCommand}" Content="{Binding Strings.Browse}" Margin="6,0,0,0" Width="75" Style="{DynamicResource SecondaryButton}" />
                             </Grid>
                         </StackPanel>
                     </Border>
 
                     <!-- 3. Audio Processing & Silence Truncation Panel -->
-                    <Border Background="{StaticResource CardBgBrush}" BorderBrush="{StaticResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="14" Margin="0,0,0,0">
+                    <Border Background="{DynamicResource CardBgBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="14" Margin="0,0,0,0">
                         <StackPanel>
-                            <TextBlock Text="{Binding Strings.SectionAudioProcessing}" FontSize="15" FontWeight="SemiBold" Foreground="{StaticResource AccentCyanBrush}" Margin="0,0,0,10" />
+                            <TextBlock Text="{Binding Strings.SectionAudioProcessing}" FontSize="15" FontWeight="SemiBold" Foreground="{DynamicResource AccentCyanBrush}" Margin="0,0,0,10" />
 
                             <!-- Silence Truncation Checkbox -->
                             <CheckBox IsChecked="{Binding EnableSilenceTruncation}" Content="{Binding Strings.EnableSilenceTruncation}" FontWeight="SemiBold" Margin="0,0,0,10" />
@@ -169,9 +169,9 @@
                                     </Grid.ColumnDefinitions>
                                     <StackPanel Orientation="Horizontal">
                                         <TextBlock Text="{Binding Strings.SilenceThreshold}" />
-                                        <TextBlock Text="{Binding Strings.SilenceThresholdHint}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="11" Margin="6,0,0,0" />
+                                        <TextBlock Text="{Binding Strings.SilenceThresholdHint}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11" Margin="6,0,0,0" />
                                     </StackPanel>
-                                    <TextBlock Grid.Column="1" Text="{Binding SilenceThresholdDb, StringFormat='{}{0:F1} dB'}" FontWeight="Bold" Foreground="{StaticResource AccentCyanBrush}" />
+                                    <TextBlock Grid.Column="1" Text="{Binding SilenceThresholdDb, StringFormat='{}{0:F1} dB'}" FontWeight="Bold" Foreground="{DynamicResource AccentCyanBrush}" />
                                 </Grid>
                                 <Slider Minimum="-70" Maximum="-20" TickFrequency="1" IsSnapToTickEnabled="True" Value="{Binding SilenceThresholdDb}" Margin="0,0,0,12" />
 
@@ -183,9 +183,9 @@
                                     </Grid.ColumnDefinitions>
                                     <StackPanel Orientation="Horizontal">
                                         <TextBlock Text="{Binding Strings.MinSilenceDuration}" />
-                                        <TextBlock Text="{Binding Strings.MinSilenceDurationHint}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="11" Margin="6,0,0,0" />
+                                        <TextBlock Text="{Binding Strings.MinSilenceDurationHint}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11" Margin="6,0,0,0" />
                                     </StackPanel>
-                                    <TextBlock Grid.Column="1" Text="{Binding MinSilenceDurationMs, StringFormat='{}{0} ms'}" FontWeight="Bold" Foreground="{StaticResource AccentCyanBrush}" />
+                                    <TextBlock Grid.Column="1" Text="{Binding MinSilenceDurationMs, StringFormat='{}{0} ms'}" FontWeight="Bold" Foreground="{DynamicResource AccentCyanBrush}" />
                                 </Grid>
                                 <Slider Minimum="100" Maximum="1500" TickFrequency="50" IsSnapToTickEnabled="True" Value="{Binding MinSilenceDurationMs}" Margin="0,0,0,12" />
                             </StackPanel>
@@ -199,7 +199,7 @@
                                 </Grid.ColumnDefinitions>
                                 <TextBlock Text="{Binding Strings.Mp3Bitrate}" VerticalAlignment="Center" Margin="0,0,12,0" />
                                 <ComboBox Grid.Column="1" ItemsSource="{Binding AvailableBitrates}" SelectedItem="{Binding SelectedBitrate}" Height="28" VerticalContentAlignment="Center" />
-                                <TextBlock Grid.Column="2" Text="kbps (CBR)" VerticalAlignment="Center" Margin="8,0,0,0" Foreground="{StaticResource TextSecondaryBrush}" />
+                                <TextBlock Grid.Column="2" Text="kbps (CBR)" VerticalAlignment="Center" Margin="8,0,0,0" Foreground="{DynamicResource TextSecondaryBrush}" />
                             </Grid>
                         </StackPanel>
                     </Border>
@@ -216,9 +216,9 @@
                 </Grid.RowDefinitions>
 
                 <!-- 4. Metadata / ID3 Panel -->
-                <Border Grid.Row="0" Background="{StaticResource CardBgBrush}" BorderBrush="{StaticResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="14" Margin="0,0,0,12">
+                <Border Grid.Row="0" Background="{DynamicResource CardBgBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="14" Margin="0,0,0,12">
                     <StackPanel>
-                        <TextBlock Text="{Binding Strings.SectionMetadata}" FontSize="15" FontWeight="SemiBold" Foreground="{StaticResource AccentCyanBrush}" Margin="0,0,0,10" />
+                        <TextBlock Text="{Binding Strings.SectionMetadata}" FontSize="15" FontWeight="SemiBold" Foreground="{DynamicResource AccentCyanBrush}" Margin="0,0,0,10" />
 
                         <Grid Margin="0,0,0,8">
                             <Grid.ColumnDefinitions>
@@ -267,23 +267,23 @@
                             
                             <!-- Thumbnail & Path -->
                             <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                                <Border Width="42" Height="42" Background="#11141A" BorderBrush="{StaticResource CardBorderBrush}" BorderThickness="1" CornerRadius="4" Margin="0,0,8,0">
+                                <Border Width="42" Height="42" Background="{DynamicResource InputBgBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="4" Margin="0,0,8,0">
                                     <Image Source="{Binding TagArtworkPath}" Stretch="UniformToFill" />
                                 </Border>
-                                <TextBlock Text="{Binding TagArtworkPath}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" MaxWidth="180" Foreground="{StaticResource TextSecondaryBrush}" FontSize="11" />
+                                <TextBlock Text="{Binding TagArtworkPath}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" MaxWidth="180" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11" />
                             </StackPanel>
 
                             <!-- Buttons -->
                             <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-                                <Button Command="{Binding BrowseArtworkCommand}" Content="{Binding Strings.SelectImage}" Style="{StaticResource SecondaryButton}" Margin="0,0,6,0" Padding="8,4" />
-                                <Button Command="{Binding ClearArtworkCommand}" Content="{Binding Strings.ClearImage}" Style="{StaticResource SecondaryButton}" Padding="8,4" />
+                                <Button Command="{Binding BrowseArtworkCommand}" Content="{Binding Strings.SelectImage}" Style="{DynamicResource SecondaryButton}" Margin="0,0,6,0" Padding="8,4" />
+                                <Button Command="{Binding ClearArtworkCommand}" Content="{Binding Strings.ClearImage}" Style="{DynamicResource SecondaryButton}" Padding="8,4" />
                             </StackPanel>
                         </Grid>
                     </StackPanel>
                 </Border>
 
                 <!-- 5. Action Log Console -->
-                <Border Grid.Row="1" Background="{StaticResource CardBgBrush}" BorderBrush="{StaticResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="14">
+                <Border Grid.Row="1" Background="{DynamicResource CardBgBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="14">
                     <Grid>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto" />
@@ -295,15 +295,16 @@
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
-                            <TextBlock Text="{Binding Strings.SectionActionLog}" FontSize="15" FontWeight="SemiBold" Foreground="{StaticResource AccentCyanBrush}" VerticalAlignment="Center" />
-                            <Button Grid.Column="1" Command="{Binding ClearLogCommand}" Content="{Binding Strings.ClearLog}" Style="{StaticResource SecondaryButton}" FontSize="11" Padding="8,2" />
+                            <TextBlock Text="{Binding Strings.SectionActionLog}" FontSize="15" FontWeight="SemiBold" Foreground="{DynamicResource AccentCyanBrush}" VerticalAlignment="Center" />
+                            <Button Grid.Column="1" Command="{Binding ClearLogCommand}" Content="{Binding Strings.ClearLog}" Style="{DynamicResource SecondaryButton}" FontSize="11" Padding="8,2" />
                         </Grid>
 
                         <!-- Log Console TextBox -->
                         <TextBox x:Name="LogTextBox" Grid.Row="1" Text="{Binding LogOutput, Mode=OneWay}"
                                  IsReadOnly="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto"
-                                 Background="#0C0E14" Foreground="#A0AEC0" FontFamily="Consolas, Meiryo UI" FontSize="11"
-                                 TextChanged="LogTextBox_TextChanged" Padding="8" BorderThickness="1" BorderBrush="#202734" />
+                                 Background="{DynamicResource ConsoleBgBrush}" Foreground="{DynamicResource TextSecondaryBrush}"
+                                 FontFamily="Consolas, Meiryo UI" FontSize="11"
+                                 TextChanged="LogTextBox_TextChanged" Padding="8" BorderThickness="1" BorderBrush="{DynamicResource CardBorderBrush}" />
                     </Grid>
                 </Border>
             </Grid>
@@ -312,7 +313,7 @@
         <!-- ==========================================
              Footer: Progress Bar & Execution Actions
              ========================================== -->
-        <Border Grid.Row="2" Background="{StaticResource CardBgBrush}" BorderBrush="{StaticResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="14,10">
+        <Border Grid.Row="2" Background="{DynamicResource CardBgBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="14,10">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <!-- Status & Progress -->
@@ -328,15 +329,15 @@
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
-                        <TextBlock Text="{Binding StatusText}" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" TextTrimming="CharacterEllipsis" />
-                        <TextBlock Grid.Column="1" Text="{Binding ProgressPercentage, StringFormat='{}{0:F0}%'}" FontWeight="Bold" Foreground="{StaticResource AccentCyanBrush}" />
+                        <TextBlock Text="{Binding StatusText}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" TextTrimming="CharacterEllipsis" />
+                        <TextBlock Grid.Column="1" Text="{Binding ProgressPercentage, StringFormat='{}{0:F0}%'}" FontWeight="Bold" Foreground="{DynamicResource AccentCyanBrush}" />
                     </Grid>
                     <ProgressBar Value="{Binding ProgressPercentage}" Maximum="100" />
                 </StackPanel>
 
                 <!-- Start / Cancel Buttons -->
                 <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                    <Button Style="{StaticResource WoodAccentButton}"
+                    <Button Style="{DynamicResource WoodAccentButton}"
                             Command="{Binding StartProcessingCommand}"
                             IsEnabled="{Binding IsProcessing, Converter={StaticResource InverseBooleanConverter}, FallbackValue=True}"
                             Padding="24,10" FontSize="14" FontWeight="Bold" Margin="0,0,10,0">
@@ -346,7 +347,7 @@
                         </StackPanel>
                     </Button>
 
-                    <Button Style="{StaticResource SecondaryButton}"
+                    <Button Style="{DynamicResource SecondaryButton}"
                             Command="{Binding CancelProcessingCommand}"
                             IsEnabled="{Binding IsProcessing}"
                             Content="{Binding Strings.Cancel}"

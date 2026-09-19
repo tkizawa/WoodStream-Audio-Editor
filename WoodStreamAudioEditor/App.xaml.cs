@@ -1,6 +1,5 @@
-﻿using System.Configuration;
-using System.Data;
 using System.Windows;
+using WoodStreamAudioEditor.Services;
 
 namespace WoodStreamAudioEditor;
 
@@ -9,5 +8,11 @@ namespace WoodStreamAudioEditor;
 /// </summary>
 public partial class App : Application
 {
-}
+    protected override void OnStartup(StartupEventArgs e)
+    {
+        base.OnStartup(e);
 
+        // Windowsのシステムテーマ（ダークモード / ライトモード）を検知して適用
+        ThemeService.Instance.DetectAndApplySystemTheme();
+    }
+}
