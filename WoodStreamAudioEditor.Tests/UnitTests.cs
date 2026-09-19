@@ -315,6 +315,82 @@ public class UnitTests
         Assert.AreEqual(48000, mp3.WaveFormat.SampleRate, "MP3のサンプリングレートが48kHzにリサンプリングされていること");
     }
 
+    /// <summary>
+    /// 実際の VST プラグイン（RX 8 Voice De-noise 等）を適用した際の波形・ノイズ検証テスト
+    /// </summary>
+    [TestMethod]
+    public async Task TestRealVstProcessing()
+    {
+        string deClickPath = @"C:\Program Files\Steinberg\VstPlugins\RX 8 De-click.dll";
+        string deNoisePath = @"C:\Program Files\Steinberg\VstPlugins\RX 8 Voice De-noise.dll";
+
+        if (!File.Exists(deNoisePath))
+        {
+            Assert.Inconclusive("RX 8 プラグインが見つからないためスキップ");
+            return;
+        }
+
+        int sampleRate = 96000;
+        string inputWav = Path.Combine(_tempDir, "test_96k_1ch.wav");
+
+        // 3秒のテスト音声を生成 (1秒音 + 1.5秒無音 + 1秒音)
+        var format = new WaveFormat(sampleRate, 16, 1);
+        using (var writer = new WaveFileWriter(inputWav, format))
+        {
+            byte[] buffer = new byte[format.AverageBytesPerSecond * 4];
+            for (int i = 0; i < sampleRate * 1; i++)
+            {
+                short sample = (short)(Math.Sin(2 * Math.PI * 440 * i / sampleRate) * 16000);
+                buffer[i * 2] = (byte)(sample & 0xFF);
+                buffer[i * 2 + 1] = (byte)((sample >> 8) & 0xFF);
+            }
+            for (int i = sampleRate * 3; i < sampleRate * 4; i++)
+            {
+                short sample = (short)(Math.Sin(2 * Math.PI * 440 * i / sampleRate) * 16000);
+                buffer[i * 2] = (byte)(sample & 0xFF);
+                buffer[i * 2 + 1] = (byte)((sample >> 8) & 0xFF);
+            }
+            writer.Write(buffer, 0, buffer.Length);
+        }
+
+        var pipelineService = new AudioPipelineService();
+        var settings = new AppSettings
+        {
+            DeClickPluginPath = File.Exists(deClickPath) ? deClickPath : string.Empty,
+            VoiceDeNoisePluginPath = deNoisePath,
+            EnableDeClick = File.Exists(deClickPath),
+            EnableVoiceDeNoise = true,
+            EnableSilenceTruncation = true,
+            SilenceThresholdDb = -42.5,
+            MinSilenceDurationMs = 350,
+            Mp3Bitrate = 192
+        };
+
+        var logs = new System.Collections.Generic.List<string>();
+        var progress = new Progress<PipelineProgress>(p =>
+        {
+            logs.Add(p.Message);
+            Console.WriteLine(p.Message);
+        });
+
+        string outputMp3 = await pipelineService.ProcessAudioAsync(
+            inputWav,
+            _tempDir,
+            settings,
+            progress,
+            System.Threading.CancellationToken.None);
+
+        Assert.IsTrue(File.Exists(outputMp3), "出力MP3ファイルが存在すること");
+
+        // MP3 を WAV にデコードして出力波形を保存
+        string outWav = @"D:\Dev\WoodStream Audio Editor\analyzed_output.wav";
+        using (var reader = new Mp3FileReader(outputMp3))
+        {
+            WaveFileWriter.CreateWaveFile(outWav, reader);
+        }
+        Console.WriteLine("Saved analyzed_output.wav for analysis");
+    }
+
     private static byte[] CreateMinimalPng()
     {
         // 1x1 RGBA PNG バイナリ

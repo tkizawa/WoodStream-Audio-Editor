@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using Jacobi.Vst.Core;
@@ -9,8 +10,8 @@ namespace WoodStreamAudioEditor.Services.Audio;
 
 /// <summary>
 /// VST 2.4 プラグイン（iZotope RX 8 De-click / Voice De-noise 等）を NAudio のパイプラインに組み込む SampleProvider
-/// ステレオ (2ch) またはモノラル (1ch) のオーディオストリームを VST プラグインに入力し、
-/// 処理後の音声を後続のプロバイダー（無音カットやMP3エンコーダー）へ渡します。
+/// VST プラグインの要件に合致するよう、常に完全な固定ブロックサイズ（1024サンプル）単位で連続処理し、
+/// 内部 FIFO キューを経由して出力することで、バッファ境界での音飛びやプチプチノイズ（断片化）を完全に防止します。
 /// </summary>
 public class VstSampleProvider : ISampleProvider, IDisposable
 {
@@ -22,8 +23,10 @@ public class VstSampleProvider : ISampleProvider, IDisposable
     private readonly VstAudioBufferManager? _outputBufferMgr;
     private readonly VstAudioBuffer[]? _inputBuffers;
     private readonly VstAudioBuffer[]? _outputBuffers;
-    private readonly float[] _sourceBuffer;
+    private readonly float[] _sourceBlockBuffer;
+    private readonly Queue<float> _outputQueue = new();
     private readonly bool _isLoaded;
+    private bool _sourceEnded = false;
 
     public WaveFormat WaveFormat => _source.WaveFormat;
     public bool IsPluginLoaded => _isLoaded;
@@ -38,7 +41,7 @@ public class VstSampleProvider : ISampleProvider, IDisposable
         PluginPath = pluginPath ?? string.Empty;
 
         int channels = _source.WaveFormat.Channels;
-        _sourceBuffer = new float[_blockSize * channels];
+        _sourceBlockBuffer = new float[_blockSize * channels];
 
         if (string.IsNullOrWhiteSpace(pluginPath) || !File.Exists(pluginPath))
         {
@@ -86,53 +89,72 @@ public class VstSampleProvider : ISampleProvider, IDisposable
         }
 
         int channels = WaveFormat.Channels;
-        int totalRead = 0;
+        int totalWritten = 0;
         int count = buffer.Length;
 
-        while (totalRead < count)
+        while (totalWritten < count)
         {
-            // 1ブロック分のサンプル数を計算
-            int samplesNeeded = Math.Min(count - totalRead, _blockSize * channels);
-            int framesNeeded = samplesNeeded / channels;
-            if (framesNeeded == 0) break;
+            // 1. 内部キューに処理済みデータがあれば先に出力バッファへコピー
+            while (_outputQueue.Count > 0 && totalWritten < count)
+            {
+                buffer[totalWritten++] = _outputQueue.Dequeue();
+            }
 
-            int samplesRead = _source.Read(_sourceBuffer.AsSpan(0, framesNeeded * channels));
-            if (samplesRead == 0) break; // ソース終了
+            if (totalWritten >= count) break;
+            if (_sourceEnded) break;
 
-            int framesRead = samplesRead / channels;
+            // 2. 内部キューが空になったら、ソースから完全な 1 ブロック (_blockSize * channels) を読み出す
+            int neededSamples = _blockSize * channels;
+            int totalReadFromSource = 0;
 
-            // 入力バッファへコピー（デインターリーブ）
+            while (totalReadFromSource < neededSamples)
+            {
+                int read = _source.Read(_sourceBlockBuffer.AsSpan(totalReadFromSource, neededSamples - totalReadFromSource));
+                if (read == 0)
+                {
+                    _sourceEnded = true;
+                    // 残りをゼロパディング
+                    Array.Clear(_sourceBlockBuffer, totalReadFromSource, neededSamples - totalReadFromSource);
+                    break;
+                }
+                totalReadFromSource += read;
+            }
+
+            if (totalReadFromSource == 0)
+            {
+                // ソース終了かつ未処理ブロックなし
+                break;
+            }
+
+            int validFrames = totalReadFromSource / channels;
+
+            // 3. 入力バッファへデインターリーブコピー
             for (int ch = 0; ch < _inputBuffers.Length; ch++)
             {
                 var inputChannel = _inputBuffers[ch];
-                int srcCh = ch < channels ? ch : 0; // 足りない場合はch0を使用
+                int srcCh = ch < channels ? ch : 0; // モノラル音源なら ch0 を両チャンネルに供給
 
-                for (int f = 0; f < framesRead; f++)
+                for (int f = 0; f < _blockSize; f++)
                 {
-                    inputChannel[f] = _sourceBuffer[f * channels + srcCh];
-                }
-                // 残りはゼロクリア
-                for (int f = framesRead; f < _blockSize; f++)
-                {
-                    inputChannel[f] = 0.0f;
+                    inputChannel[f] = _sourceBlockBuffer[f * channels + srcCh];
                 }
             }
 
-            // VST 処理実行
+            // 4. VST プラグインによる完全な 1 ブロック処理 (1024 サンプル)
             _pluginContext.PluginCommandStub.Commands.ProcessReplacing(_inputBuffers, _outputBuffers);
 
-            // 出力バッファからインターリーブして出力配列へ書き出し
-            for (int f = 0; f < framesRead; f++)
+            // 5. 処理結果をインターリーブして内部キューへ格納 (有効なフレーム数分のみ)
+            for (int f = 0; f < validFrames; f++)
             {
                 for (int ch = 0; ch < channels; ch++)
                 {
                     int outCh = ch < _outputBuffers.Length ? ch : 0;
-                    buffer[totalRead++] = _outputBuffers[outCh][f];
+                    _outputQueue.Enqueue(_outputBuffers[outCh][f]);
                 }
             }
         }
 
-        return totalRead;
+        return totalWritten;
     }
 
     public void Dispose()

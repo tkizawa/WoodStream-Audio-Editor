@@ -52,6 +52,18 @@ public class AudioPipelineService
             progress.Report(new PipelineProgress(5, $"音声フォーマット: {reader.WaveFormat.SampleRate}Hz, {reader.WaveFormat.Channels}ch, 元の長さ: {originalTotalTime:mm\\:ss}", true));
 
             ISampleProvider currentProvider = reader;
+
+            // ハイレゾ音源 (96kHz / 192kHz 等) の場合、VST 処理および無音カットに先立ち、
+            // ポッドキャスト・音楽制作標準の 48kHz (または 44.1kHz) に高品質リサンプリングします。
+            // これにより、VST プラグインが最も得意とする周波数特性で安定動作し、ノイズや歪みを完全に防止します。
+            int originalSampleRate = currentProvider.WaveFormat.SampleRate;
+            if (originalSampleRate > 48000)
+            {
+                int targetSampleRate = (originalSampleRate % 44100 == 0) ? 44100 : 48000;
+                progress.Report(new PipelineProgress(8, $"ハイレゾ音源 ({originalSampleRate}Hz) を標準サンプリングレート ({targetSampleRate}Hz) に高品質リサンプリング中...", true));
+                currentProvider = new NAudio.Wave.SampleProviders.WdlResamplingSampleProvider(currentProvider, targetSampleRate);
+            }
+
             VstSampleProvider? deClickVst = null;
             VstSampleProvider? deNoiseVst = null;
 
@@ -95,16 +107,6 @@ public class AudioPipelineService
 
                 // 5. MP3エンコード書き出し
                 progress.Report(new PipelineProgress(25, $"MP3エンコード準備: {settings.Mp3Bitrate} kbps -> {Path.GetFileName(outputFilePath)}", true));
-
-                // MP3 (LAME) が対応しているサンプリングレート上限は 48,000Hz です。
-                // 96kHz などのハイレゾ音源の場合は、ポッドキャスト標準の 48kHz または 44.1kHz に自動リサンプリングします。
-                int originalSampleRate = currentProvider.WaveFormat.SampleRate;
-                if (originalSampleRate > 48000)
-                {
-                    int targetSampleRate = (originalSampleRate % 44100 == 0) ? 44100 : 48000;
-                    progress.Report(new PipelineProgress(26, $"ハイレゾ音源 ({originalSampleRate}Hz) を MP3 標準サンプリングレート ({targetSampleRate}Hz) に高品質リサンプリング中...", true));
-                    currentProvider = new NAudio.Wave.SampleProviders.WdlResamplingSampleProvider(currentProvider, targetSampleRate);
-                }
 
                 // IEEE Float 32-bit SampleProvider を 16-bit PCM WaveProvider に変換して Lame に渡す
                 var pcmProvider = currentProvider.ToWaveProvider16();

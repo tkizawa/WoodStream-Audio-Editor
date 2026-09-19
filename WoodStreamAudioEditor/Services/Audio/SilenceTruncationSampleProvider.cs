@@ -7,12 +7,11 @@ namespace WoodStreamAudioEditor.Services.Audio;
 /// <summary>
 /// 音量（dB）が指定した閾値以下の無音・環境音部分を自動的に検知・短縮する SampleProvider
 /// 指定した「保持する最小無音時間」を超える不要なポーズ部分をカットし、
-/// クリックノイズ防止のクロスフェードを適用して自然なポッドキャスト音声を生成します。
+/// カット境界の前後（フェードアウト・フェードイン）でクリックノイズ防止のクロスフェードを適用します。
 /// </summary>
 public class SilenceTruncationSampleProvider : ISampleProvider
 {
     private readonly ISampleProvider _source;
-    private readonly double _thresholdDb;
     private readonly double _thresholdLinear;
     private readonly int _minSilenceFrames;
     private readonly int _windowSizeFrames;
@@ -22,7 +21,7 @@ public class SilenceTruncationSampleProvider : ISampleProvider
     // 内部バッファと状態
     private readonly float[] _windowBuffer;
     private readonly Queue<float> _outputQueue = new();
-    private bool _inSilence = false;
+    private bool _inTruncatedSilence = false;
     private int _consecutiveSilenceFrames = 0;
     private long _totalInputFrames = 0;
     private long _totalOutputFrames = 0;
@@ -35,16 +34,9 @@ public class SilenceTruncationSampleProvider : ISampleProvider
     /// <summary>カットされた総時間（秒）</summary>
     public double TruncatedDurationSeconds => (double)TruncatedFrames / WaveFormat.SampleRate;
 
-    /// <summary>
-    /// コンストラクタ
-    /// </summary>
-    /// <param name="source">入力オーディオプロバイダ</param>
-    /// <param name="thresholdDb">無音判定閾値 (dB, 例: -45.0)</param>
-    /// <param name="minSilenceDurationMs">保持する最小無音時間 (ミリ秒, 例: 400ms)</param>
     public SilenceTruncationSampleProvider(ISampleProvider source, double thresholdDb = -45.0, int minSilenceDurationMs = 400)
     {
         _source = source ?? throw new ArgumentNullException(nameof(source));
-        _thresholdDb = thresholdDb;
         _thresholdLinear = Math.Pow(10.0, thresholdDb / 20.0);
         _channels = source.WaveFormat.Channels;
 
@@ -110,26 +102,36 @@ public class SilenceTruncationSampleProvider : ISampleProvider
                 }
                 else
                 {
-                    // 最小無音時間を超えた余剰な無音部分はスキップ（出力キューに入れない）
-                    if (!_inSilence && _outputQueue.Count >= _fadeFrames * _channels)
+                    // 最小無音時間を超えた余剰な無音部分
+                    if (!_inTruncatedSilence)
                     {
-                        _inSilence = true;
+                        // 無音スキップ突入の瞬間：末尾をスムーズにフェードアウトさせてクリック音を完全防止
+                        _inTruncatedSilence = true;
+                        int fadeFramesCount = Math.Min(framesRead, _fadeFrames);
+                        for (int f = 0; f < fadeFramesCount; f++)
+                        {
+                            float gain = 1.0f - ((float)f / fadeFramesCount);
+                            for (int c = 0; c < _channels; c++)
+                            {
+                                _outputQueue.Enqueue(_windowBuffer[f * _channels + c] * gain);
+                            }
+                        }
                     }
+                    // それ以降の無音はスキップ（出力キューに入れない）
                 }
             }
             else
             {
-                // 音声検出
-                if (_inSilence)
+                // 有声区間
+                if (_inTruncatedSilence)
                 {
-                    // 無音スキップからの復帰時：クリック音防止のため先頭をスムーズにフェードイン
-                    _inSilence = false;
-                    int fadeSampleCount = Math.Min(samplesRead, _fadeFrames * _channels);
-                    int fadeFrameCount = fadeSampleCount / _channels;
+                    // 無音スキップからの復帰時：先頭をスムーズにフェードイン
+                    _inTruncatedSilence = false;
+                    int fadeFramesCount = Math.Min(framesRead, _fadeFrames);
 
-                    for (int f = 0; f < fadeFrameCount; f++)
+                    for (int f = 0; f < fadeFramesCount; f++)
                     {
-                        float gain = (float)f / fadeFrameCount;
+                        float gain = (float)f / fadeFramesCount;
                         for (int c = 0; c < _channels; c++)
                         {
                             _windowBuffer[f * _channels + c] *= gain;
