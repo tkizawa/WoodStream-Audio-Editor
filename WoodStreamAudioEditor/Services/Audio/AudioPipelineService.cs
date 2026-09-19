@@ -94,7 +94,17 @@ public class AudioPipelineService
                 }
 
                 // 5. MP3エンコード書き出し
-                progress.Report(new PipelineProgress(25, $"MP3エンコード開始: {settings.Mp3Bitrate} kbps -> {Path.GetFileName(outputFilePath)}"));
+                progress.Report(new PipelineProgress(25, $"MP3エンコード準備: {settings.Mp3Bitrate} kbps -> {Path.GetFileName(outputFilePath)}"));
+
+                // MP3 (LAME) が対応しているサンプリングレート上限は 48,000Hz です。
+                // 96kHz などのハイレゾ音源の場合は、ポッドキャスト標準の 48kHz または 44.1kHz に自動リサンプリングします。
+                int originalSampleRate = currentProvider.WaveFormat.SampleRate;
+                if (originalSampleRate > 48000)
+                {
+                    int targetSampleRate = (originalSampleRate % 44100 == 0) ? 44100 : 48000;
+                    progress.Report(new PipelineProgress(26, $"ハイレゾ音源 ({originalSampleRate}Hz) を MP3 標準サンプリングレート ({targetSampleRate}Hz) に高品質リサンプリング中..."));
+                    currentProvider = new NAudio.Wave.SampleProviders.WdlResamplingSampleProvider(currentProvider, targetSampleRate);
+                }
 
                 // IEEE Float 32-bit SampleProvider を 16-bit PCM WaveProvider に変換して Lame に渡す
                 var pcmProvider = currentProvider.ToWaveProvider16();

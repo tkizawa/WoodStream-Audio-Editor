@@ -259,6 +259,62 @@ public class UnitTests
             $"再生時間({mp3File.Properties.Duration.TotalSeconds:F2}秒)が無音カットにより短縮されていること");
     }
 
+    /// <summary>
+    /// 96kHz (96,000Hz) ハイレゾ音声ファイルが自動的に 48kHz にリサンプリングされ、
+    /// LAME MP3エンコードで Unsupported Sample Rate エラーにならず正常に書き出せるかの検証
+    /// </summary>
+    [TestMethod]
+    public async Task Test96kHzAudioPipelineResampling()
+    {
+        int sampleRate = 96000; // 96kHz ハイレゾ音源
+        int channels = 2;
+        string inputWav = Path.Combine(_tempDir, "highres_96khz_input.wav");
+
+        var format = new WaveFormat(sampleRate, 16, channels);
+        using (var writer = new WaveFileWriter(inputWav, format))
+        {
+            byte[] buffer = new byte[format.AverageBytesPerSecond * 2]; // 2秒
+            for (int i = 0; i < sampleRate * 2; i++)
+            {
+                short sample = (short)(Math.Sin(2 * Math.PI * 440 * i / sampleRate) * 16000);
+                byte b1 = (byte)(sample & 0xFF);
+                byte b2 = (byte)((sample >> 8) & 0xFF);
+                int idx = i * 4;
+                buffer[idx] = b1;
+                buffer[idx + 1] = b2;
+                buffer[idx + 2] = b1;
+                buffer[idx + 3] = b2;
+            }
+            writer.Write(buffer, 0, buffer.Length);
+        }
+
+        var pipelineService = new AudioPipelineService();
+        var settings = new AppSettings
+        {
+            EnableDeClick = false,
+            EnableVoiceDeNoise = false,
+            EnableSilenceTruncation = false,
+            Mp3Bitrate = 192
+        };
+
+        var logs = new System.Collections.Generic.List<string>();
+        var progress = new Progress<PipelineProgress>(p => logs.Add(p.Message));
+
+        // 96kHz 音源の処理実行（エラーが発生せず成功すること）
+        string outputMp3 = await pipelineService.ProcessAudioAsync(
+            inputWav,
+            _tempDir,
+            settings,
+            progress,
+            System.Threading.CancellationToken.None);
+
+        Assert.IsTrue(File.Exists(outputMp3), "96kHz音源からMP3が正常に出力されていること");
+
+        // MP3のサンプリングレートが 48kHz になっていることを検証
+        using var mp3 = new Mp3FileReader(outputMp3);
+        Assert.AreEqual(48000, mp3.WaveFormat.SampleRate, "MP3のサンプリングレートが48kHzにリサンプリングされていること");
+    }
+
     private static byte[] CreateMinimalPng()
     {
         // 1x1 RGBA PNG バイナリ
