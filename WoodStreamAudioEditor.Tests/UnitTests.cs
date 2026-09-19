@@ -58,6 +58,7 @@ public class UnitTests
             EnableEnding = true,
             EndingFilePath = @"C:\Music\ending.wav",
             EndingVolume = 0.75,
+            EnableCarAudioEq = true,
             WindowLeft = 120,
             WindowTop = 80,
             WindowWidth = 1050,
@@ -84,6 +85,7 @@ public class UnitTests
         Assert.AreEqual(true, loaded.EnableEnding);
         Assert.AreEqual(@"C:\Music\ending.wav", loaded.EndingFilePath);
         Assert.AreEqual(0.75, loaded.EndingVolume);
+        Assert.AreEqual(true, loaded.EnableCarAudioEq);
         Assert.AreEqual(120, loaded.WindowLeft);
         Assert.AreEqual(80, loaded.WindowTop);
         Assert.AreEqual(1050, loaded.WindowWidth);
@@ -683,6 +685,127 @@ public class UnitTests
             0x05, 0x00, 0x01, 0x0D, 0x0A, 0x2D, 0xB4, 0x00, 0x00, 0x00, 0x00, 0x49,
             0x45, 0x4E, 0x44, 0xAE, 0x42, 0x60, 0x82
         };
+    }
+
+    /// <summary>
+    /// 車内向け固定EQ (CarAudioEqProvider) の周波数特性検証
+    /// 50Hz (ローカット帯域), 1400Hz (声の明瞭度ブースト帯域), 15kHz (ハイカット帯域) のゲイン変化を検証
+    /// </summary>
+    [TestMethod]
+    public void TestCarAudioEqProvider_FrequencyResponse()
+    {
+        int sampleRate = 44100;
+        int channels = 1;
+        var waveFormat = WaveFormat.CreateIeeeFloatWaveFormat(sampleRate, channels);
+
+        // 各周波数のサイン波を1秒間 (44100サンプル) 生成してテスト
+        int sampleCount = sampleRate;
+
+        // 1. 50Hz: -12dB (振幅は約0.25倍になるはず)
+        float[] samples50Hz = CreateSineWave(sampleRate, 50.0, sampleCount, 0.5f);
+        var source50 = new TestArraySampleProvider(waveFormat, (float[])samples50Hz.Clone());
+        var eq50 = new CarAudioEqProvider(source50);
+        float[] output50 = new float[sampleCount];
+        eq50.Read(output50.AsSpan());
+
+        // フィルターの立ち上がり過渡応答を避けるため、後半（0.5秒〜1.0秒）の実効値(RMS)を比較
+        float inRms50 = CalculateRms(samples50Hz.AsSpan(sampleCount / 2));
+        float outRms50 = CalculateRms(output50.AsSpan(sampleCount / 2));
+        double gainDb50 = 20 * Math.Log10(outRms50 / inRms50);
+        
+        // -12dBに対して、-13dB〜-9dBの範囲に収まっていること（急峻なローシェルフ）
+        Assert.IsTrue(gainDb50 < -8.0, $"50Hz should be attenuated by ~ -12dB, but was {gainDb50:F2} dB");
+
+        // 2. 1400Hz: +4dB (振幅は約1.58倍になるはず)
+        float[] samples1400Hz = CreateSineWave(sampleRate, 1400.0, sampleCount, 0.3f);
+        var source1400 = new TestArraySampleProvider(waveFormat, (float[])samples1400Hz.Clone());
+        var eq1400 = new CarAudioEqProvider(source1400);
+        float[] output1400 = new float[sampleCount];
+        eq1400.Read(output1400.AsSpan());
+
+        float inRms1400 = CalculateRms(samples1400Hz.AsSpan(sampleCount / 2));
+        float outRms1400 = CalculateRms(output1400.AsSpan(sampleCount / 2));
+        double gainDb1400 = 20 * Math.Log10(outRms1400 / inRms1400);
+
+        // +4dBに対して、+2.5dB〜+5.5dBの範囲にブーストされていること
+        Assert.IsTrue(gainDb1400 > 2.5 && gainDb1400 < 5.5, $"1400Hz should be boosted by ~ +4dB, but was {gainDb1400:F2} dB");
+
+        // 3. 15000Hz: -4dB (振幅は約0.63倍になるはず)
+        float[] samples15kHz = CreateSineWave(sampleRate, 15000.0, sampleCount, 0.5f);
+        var source15k = new TestArraySampleProvider(waveFormat, (float[])samples15kHz.Clone());
+        var eq15k = new CarAudioEqProvider(source15k);
+        float[] output15k = new float[sampleCount];
+        eq15k.Read(output15k.AsSpan());
+
+        float inRms15k = CalculateRms(samples15kHz.AsSpan(sampleCount / 2));
+        float outRms15k = CalculateRms(output15k.AsSpan(sampleCount / 2));
+        double gainDb15k = 20 * Math.Log10(outRms15k / inRms15k);
+
+        // -4dBに対して、-2.5dB〜-6.0dBに減衰していること
+        Assert.IsTrue(gainDb15k < -2.5, $"15kHz should be attenuated by ~ -4dB, but was {gainDb15k:F2} dB");
+    }
+
+    /// <summary>
+    /// ステレオ（2チャンネル）時、左右が独立してフィルタリングされ、相互干渉・クロストークがないことの検証
+    /// </summary>
+    [TestMethod]
+    public void TestCarAudioEqProvider_StereoChannelsIndependent()
+    {
+        int sampleRate = 44100;
+        int channels = 2;
+        var waveFormat = WaveFormat.CreateIeeeFloatWaveFormat(sampleRate, channels);
+
+        int sampleCountPerChannel = sampleRate;
+        float[] interleaved = new float[sampleCountPerChannel * 2];
+
+        // Lチャンネルは 1400Hz サイン波 (+4dB ブースト帯域)
+        // Rチャンネルは 無音 (0.0f)
+        for (int i = 0; i < sampleCountPerChannel; i++)
+        {
+            double t = (double)i / sampleRate;
+            interleaved[i * 2] = (float)(0.3 * Math.Sin(2 * Math.PI * 1400.0 * t)); // L
+            interleaved[i * 2 + 1] = 0.0f; // R
+        }
+
+        var source = new TestArraySampleProvider(waveFormat, interleaved);
+        var eq = new CarAudioEqProvider(source);
+        float[] output = new float[interleaved.Length];
+        eq.Read(output.AsSpan());
+
+        // Lチャンネルは信号がありブーストされていること
+        float leftRms = 0;
+        float rightRms = 0;
+        for (int i = sampleCountPerChannel / 2; i < sampleCountPerChannel; i++)
+        {
+            leftRms += output[i * 2] * output[i * 2];
+            rightRms += output[i * 2 + 1] * output[i * 2 + 1];
+        }
+        leftRms = (float)Math.Sqrt(leftRms / (sampleCountPerChannel / 2));
+        rightRms = (float)Math.Sqrt(rightRms / (sampleCountPerChannel / 2));
+
+        Assert.IsTrue(leftRms > 0.3f, "Left channel should have processed boosted signal");
+        Assert.AreEqual(0.0f, rightRms, 1e-6f, "Right channel should remain completely silent without crosstalk");
+    }
+
+    private static float[] CreateSineWave(int sampleRate, double frequency, int length, float amplitude)
+    {
+        float[] buffer = new float[length];
+        for (int i = 0; i < length; i++)
+        {
+            double t = (double)i / sampleRate;
+            buffer[i] = (float)(amplitude * Math.Sin(2 * Math.PI * frequency * t));
+        }
+        return buffer;
+    }
+
+    private static float CalculateRms(ReadOnlySpan<float> samples)
+    {
+        double sum = 0;
+        for (int i = 0; i < samples.Length; i++)
+        {
+            sum += samples[i] * samples[i];
+        }
+        return (float)Math.Sqrt(sum / samples.Length);
     }
 
     /// <summary>

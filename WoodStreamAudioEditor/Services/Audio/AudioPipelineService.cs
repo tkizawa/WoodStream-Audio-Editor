@@ -118,6 +118,13 @@ public class AudioPipelineService
                     currentProvider = deNoiseVst;
                 }
 
+                // 3.5. 車内向け音声チューニング（ローカット＆明瞭度アップ イコライザー）
+                if (settings.EnableCarAudioEq)
+                {
+                    progress.Report(new PipelineProgress(18, "車内向け音声チューニング（ローカット＆明瞭度アップEQ）を適用中...", true));
+                    currentProvider = new CarAudioEqProvider(currentProvider);
+                }
+
                 // 4. 無音自動削除 (Silence Truncation)
                 SilenceTruncationSampleProvider? silenceProvider = null;
                 if (settings.EnableSilenceTruncation)

@@ -216,6 +216,14 @@
 
                             <Separator Background="{DynamicResource CardBorderBrush}" Margin="0,4,0,12" />
 
+                            <!-- Car Audio EQ Checkbox -->
+                            <StackPanel Margin="0,0,0,12">
+                                <CheckBox IsChecked="{Binding EnableCarAudioEq}" Content="{Binding Strings.EnableCarAudioEq}" FontWeight="SemiBold" Margin="0,0,0,4" />
+                                <TextBlock Text="{Binding Strings.CarAudioEqHint}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11" Margin="24,0,0,0" TextWrapping="Wrap" />
+                            </StackPanel>
+
+                            <Separator Background="{DynamicResource CardBorderBrush}" Margin="0,0,0,12" />
+
                             <!-- Silence Truncation Checkbox -->
                             <CheckBox IsChecked="{Binding EnableSilenceTruncation}" Content="{Binding Strings.EnableSilenceTruncation}" FontWeight="SemiBold" Margin="0,0,0,10" />
 

@@ -112,6 +112,9 @@ public partial class MainViewModel : ObservableObject
     }
 
     [ObservableProperty]
+    private bool _enableCarAudioEq = true;
+
+    [ObservableProperty]
     private bool _enableSilenceTruncation = true;
 
     [ObservableProperty]
@@ -593,6 +596,8 @@ public partial class MainViewModel : ObservableObject
         TrimStartSeconds = settings.TrimStartSeconds;
         TrimEndSeconds = settings.TrimEndSeconds;
 
+        EnableCarAudioEq = settings.EnableCarAudioEq;
+
         EnableSilenceTruncation = settings.EnableSilenceTruncation;
         SilenceThresholdDb = settings.SilenceThresholdDb;
         MinSilenceDurationMs = settings.MinSilenceDurationMs;
@@ -660,6 +665,7 @@ public partial class MainViewModel : ObservableObject
             EnableTrim = EnableTrim,
             TrimStartSeconds = TrimStartSeconds,
             TrimEndSeconds = TrimEndSeconds,
+            EnableCarAudioEq = EnableCarAudioEq,
             EnableSilenceTruncation = EnableSilenceTruncation,
             SilenceThresholdDb = SilenceThresholdDb,
             MinSilenceDurationMs = MinSilenceDurationMs,

@@ -33,6 +33,9 @@ public class AppSettings
     public double TrimStartSeconds { get; set; } = 0.0; // 秒
     public double TrimEndSeconds { get; set; } = 0.0;   // 秒
 
+    // 車内向け音声チューニング（イコライザー）設定
+    public bool EnableCarAudioEq { get; set; } = true;
+
     // 無音削除設定
     public bool EnableSilenceTruncation { get; set; } = true;
     public double SilenceThresholdDb { get; set; } = -45.0; // dB

@@ -92,6 +92,10 @@ public class LocalizationService : INotifyPropertyChanged
     public string AudioDuration => IsJapanese ? "元の音声の長さ:" : "Audio Duration:";
     public string EstimatedDuration => IsJapanese ? "カット後の予想の長さ:" : "Est. Duration:";
 
+    // 車内向け音声チューニング (イコライザー)
+    public string EnableCarAudioEq => IsJapanese ? "車内向け音声チューニング（ローカット＆明瞭度アップ）を適用する" : "Apply Car Audio Tuning (Low-cut & Vocal Clarity Boost)";
+    public string CarAudioEqHint => IsJapanese ? "（走行騒音・低域をカットし、1kHz〜2kHzをブーストして騒音下でも声を聞き取りやすくします）" : "(Cuts road rumble & boosts 1kHz-2kHz presence for optimal listening in vehicles)";
+
     public string EnableSilenceTruncation => IsJapanese ? "無音部分の自動カット (Silence Truncation) を有効にする" : "Enable Silence Truncation";
     public string SilenceThreshold => IsJapanese ? "無音判定音量閾値 (dB):" : "Silence Volume Threshold (dB):";
     public string SilenceThresholdHint => IsJapanese ? "（推奨: -45dB 〜 -40dB。環境音と音声の境目）" : "(Recommended: -45dB to -40dB)";
