@@ -107,10 +107,7 @@ public class LocalizationService : INotifyPropertyChanged
     public string BgmRuleHint => IsJapanese ? "※ 音声の最後の10秒前から5秒間かけてフェードアウトして終了します" : "* Fades out over 5s starting 10s before speech ends";
     public string EnableEnding => IsJapanese ? "エンディング曲をミックスする" : "Enable Ending Music";
     public string EndingFile => IsJapanese ? "エンディング曲音源 (WAV/MP3):" : "Ending File (WAV/MP3):";
-    public string EndingVolume => IsJapanese ? "エンディング曲音量:" : "Ending Volume:";
-    public string EndingRuleHint => IsJapanese ? "※ 音声の最後の5秒前から5秒間かけてフェードインします" : "* Fades in over 5s starting 5s before speech ends";
-    public string EndingExtraDuration => IsJapanese ? "本編終了後の余韻時間 (秒):" : "Outro Duration (sec):";
-    public string EndingExtraDurationHint => IsJapanese ? "（本編終了後にエンディング曲を単独再生する秒数。末尾5秒フェードアウト）" : "(Duration to play ending after speech ends)";
+    public string EndingRuleHint => IsJapanese ? "※ 音声の最後の5秒前から5秒間かけてフェードインし、曲の最後まで再生します（フェードアウトなし）" : "* Fades in over 5s starting 5s before speech ends and plays to completion (no fade-out)";
 
     // メタデータ
     public string TagTitle => IsJapanese ? "タイトル (エピソード名):" : "Episode Title:";

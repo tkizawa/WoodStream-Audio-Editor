@@ -323,21 +323,7 @@
                                     <TextBlock Text="{Binding Strings.EndingVolume}" />
                                     <TextBlock Grid.Column="1" Text="{Binding EndingVolume, StringFormat='{}{0:P0}'}" FontWeight="Bold" Foreground="{DynamicResource AccentCyanBrush}" />
                                 </Grid>
-                                <Slider Minimum="0.0" Maximum="1.0" TickFrequency="0.05" Value="{Binding EndingVolume}" Margin="0,0,0,8" />
-
-                                <!-- Ending Extra Duration Slider -->
-                                <Grid Margin="0,0,0,4">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <StackPanel Orientation="Horizontal">
-                                        <TextBlock Text="{Binding Strings.EndingExtraDuration}" />
-                                        <TextBlock Text="{Binding Strings.EndingExtraDurationHint}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11" Margin="6,0,0,0" />
-                                    </StackPanel>
-                                    <TextBlock Grid.Column="1" Text="{Binding EndingExtraSeconds, StringFormat='{}{0:F0} 秒'}" FontWeight="Bold" Foreground="{DynamicResource AccentCyanBrush}" />
-                                </Grid>
-                                <Slider Minimum="5" Maximum="60" TickFrequency="1" IsSnapToTickEnabled="True" Value="{Binding EndingExtraSeconds}" Margin="0,0,0,4" />
+                                <Slider Minimum="0.0" Maximum="1.0" TickFrequency="0.05" Value="{Binding EndingVolume}" Margin="0,0,0,4" />
                             </StackPanel>
                         </StackPanel>
                     </Border>

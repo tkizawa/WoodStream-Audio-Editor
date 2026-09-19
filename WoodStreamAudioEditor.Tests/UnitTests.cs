@@ -635,10 +635,10 @@ public class UnitTests
 
         Assert.IsTrue(File.Exists(outputMp3), "ミックス後のMP3が出力されていること");
 
-        // 本編15秒 + 余韻5秒 = 約20秒
+        // 本編15秒 - 5秒 + ED8秒 = 約18秒 (最後まで完全再生)
         using var mp3 = new Mp3FileReader(outputMp3);
         double dur = mp3.TotalTime.TotalSeconds;
-        Assert.IsTrue(Math.Abs(dur - 20.0) < 0.5, $"総再生時間が約20秒であること (実際: {dur:F2}秒)");
+        Assert.IsTrue(Math.Abs(dur - 18.0) < 0.5, $"総再生時間がED曲終了までの約18秒であること (実際: {dur:F2}秒)");
     }
 
     private static byte[] CreateMinimalPng()

@@ -226,13 +226,12 @@ public class AudioPipelineService
                             long fadeInStart = Math.Max(0, mainVoiceFrames - (48000 * 5));
                             long fadeInDuration = 48000 * 5; // 5秒間
 
-                            // 本編終了後の余韻時間
-                            long extraFrames = (long)(Math.Max(0, settings.EndingExtraSeconds) * 48000);
-                            long stopFrame = mainVoiceFrames + extraFrames;
+                            // エンディング曲は最後まで完全再生（フェードアウト不要）
+                            long endingTotalFrames = (long)(endingReader.TotalTime.TotalSeconds * 48000);
+                            long stopFrame = fadeInStart + endingTotalFrames;
                             totalMixFrames = Math.Max(totalMixFrames, stopFrame);
 
-                            long fadeOutDuration = Math.Min(48000 * 5, extraFrames); // 終了直前最大5秒フェードアウト
-                            long fadeOutStart = stopFrame - fadeOutDuration;
+                            progress.Report(new PipelineProgress(62, $"エンディング曲適用: {Path.GetFileName(settings.EndingFilePath)} (長さ: {endingReader.TotalTime:mm\\:ss}, 音量: {settings.EndingVolume * 100:F0}%, 最後まで再生)", true));
 
                             endingTrack = new MixingTrack(edProvider)
                             {
@@ -241,8 +240,8 @@ public class AudioPipelineService
                                 StopFrame = stopFrame,
                                 FadeInStartFrame = fadeInStart,
                                 FadeInDurationFrames = fadeInDuration,
-                                FadeOutStartFrame = fadeOutStart,
-                                FadeOutDurationFrames = fadeOutDuration
+                                FadeOutStartFrame = null, // フェードアウト不要
+                                FadeOutDurationFrames = 0
                             };
                         }
 
