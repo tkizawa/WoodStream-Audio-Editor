@@ -228,10 +228,10 @@ public partial class MainViewModel : ObservableObject
 
         string[] commonDirs =
         {
+            @"C:\Program Files\Steinberg\VstPlugins",
             @"C:\Program Files\VstPlugins\iZotope RX 8 Elements",
             @"C:\Program Files\Steinberg\VstPlugins\iZotope RX 8 Elements",
             @"C:\Program Files\VstPlugins",
-            @"C:\Program Files\Steinberg\VstPlugins",
             @"C:\Program Files\Common Files\VST2"
         };
 
@@ -244,10 +244,16 @@ public partial class MainViewModel : ObservableObject
 
             if (!foundDeClick)
             {
+                // iZRX8De-click.dll はエンジンDLLのため除外、正規の 'RX 8 De-click.dll' を優先
                 var deClickFiles = Directory.GetFiles(dir, "*De-click*.dll", SearchOption.AllDirectories);
-                if (deClickFiles.Length > 0)
+                var validDeClick = deClickFiles
+                    .Where(f => !Path.GetFileName(f).StartsWith("iZ", StringComparison.OrdinalIgnoreCase))
+                    .Concat(deClickFiles)
+                    .FirstOrDefault();
+
+                if (validDeClick != null)
                 {
-                    DeClickPluginPath = deClickFiles[0];
+                    DeClickPluginPath = validDeClick;
                     foundDeClick = true;
                     AppendLog($"[自動検出] De-click を発見: {DeClickPluginPath}");
                 }
@@ -256,9 +262,14 @@ public partial class MainViewModel : ObservableObject
             if (!foundDeNoise)
             {
                 var deNoiseFiles = Directory.GetFiles(dir, "*Voice De-noise*.dll", SearchOption.AllDirectories);
-                if (deNoiseFiles.Length > 0)
+                var validDeNoise = deNoiseFiles
+                    .Where(f => !Path.GetFileName(f).StartsWith("iZ", StringComparison.OrdinalIgnoreCase))
+                    .Concat(deNoiseFiles)
+                    .FirstOrDefault();
+
+                if (validDeNoise != null)
                 {
-                    VoiceDeNoisePluginPath = deNoiseFiles[0];
+                    VoiceDeNoisePluginPath = validDeNoise;
                     foundDeNoise = true;
                     AppendLog($"[自動検出] Voice De-noise を発見: {VoiceDeNoisePluginPath}");
                 }
@@ -348,7 +359,11 @@ public partial class MainViewModel : ObservableObject
         var progress = new Progress<PipelineProgress>(p =>
         {
             ProgressPercentage = p.Percentage;
-            AppendLog(p.Message);
+            StatusText = p.Message;
+            if (p.LogToConsole)
+            {
+                AppendLog(p.Message);
+            }
         });
 
         try
@@ -456,8 +471,20 @@ public partial class MainViewModel : ObservableObject
             TagTitle = settings.DefaultTitle;
         }
 
-        // プラグインパスが空の場合は自動検出を試みる
-        if (string.IsNullOrWhiteSpace(DeClickPluginPath) && string.IsNullOrWhiteSpace(VoiceDeNoisePluginPath))
+        // 以前のバージョンで iZRX8De-click.dll (エンジンDLL) が保存されている場合、正規の VST2 プラグインに補正
+        if (!string.IsNullOrWhiteSpace(DeClickPluginPath) && Path.GetFileName(DeClickPluginPath).Equals("iZRX8De-click.dll", StringComparison.OrdinalIgnoreCase))
+        {
+            string dir = Path.GetDirectoryName(DeClickPluginPath) ?? string.Empty;
+            string correctPath = Path.Combine(dir, "RX 8 De-click.dll");
+            if (File.Exists(correctPath))
+            {
+                DeClickPluginPath = correctPath;
+            }
+        }
+
+        // プラグインパスが空または見つからない場合は自動検出を試みる
+        if (string.IsNullOrWhiteSpace(DeClickPluginPath) || !File.Exists(DeClickPluginPath) ||
+            string.IsNullOrWhiteSpace(VoiceDeNoisePluginPath) || !File.Exists(VoiceDeNoisePluginPath))
         {
             AutoDetectPlugins();
         }

@@ -11,7 +11,7 @@ namespace WoodStreamAudioEditor.Services.Audio;
 /// <summary>
 /// 音声処理パイプラインの実行情報
 /// </summary>
-public record PipelineProgress(double Percentage, string Message);
+public record PipelineProgress(double Percentage, string Message, bool LogToConsole = true);
 
 /// <summary>
 /// 音声処理パイプライン実行サービス
@@ -44,12 +44,12 @@ public class AudioPipelineService
             string inputFileNameWithoutExt = Path.GetFileNameWithoutExtension(inputFilePath);
             string outputFilePath = Path.Combine(outputDirectory, $"{inputFileNameWithoutExt}_edited.mp3");
 
-            progress.Report(new PipelineProgress(0, $"入力音声ファイルを読み込み中: {Path.GetFileName(inputFilePath)}"));
+            progress.Report(new PipelineProgress(0, $"入力音声ファイルを読み込み中: {Path.GetFileName(inputFilePath)}", true));
 
             // 1. 入力オーディオリーダー（WAV / MP3を自動判別し IEEE Float 32bit で読み込み）
             using var reader = new AudioFileReader(inputFilePath);
             var originalTotalTime = reader.TotalTime;
-            progress.Report(new PipelineProgress(5, $"音声フォーマット: {reader.WaveFormat.SampleRate}Hz, {reader.WaveFormat.Channels}ch, 元の長さ: {originalTotalTime:mm\\:ss}"));
+            progress.Report(new PipelineProgress(5, $"音声フォーマット: {reader.WaveFormat.SampleRate}Hz, {reader.WaveFormat.Channels}ch, 元の長さ: {originalTotalTime:mm\\:ss}", true));
 
             ISampleProvider currentProvider = reader;
             VstSampleProvider? deClickVst = null;
@@ -60,24 +60,24 @@ public class AudioPipelineService
                 // 2. VST プラグイン 1: De-click
                 if (settings.EnableDeClick && !string.IsNullOrWhiteSpace(settings.DeClickPluginPath))
                 {
-                    progress.Report(new PipelineProgress(10, $"VST [De-click] を適用中..."));
+                    progress.Report(new PipelineProgress(10, $"VST [De-click] を適用中... ({Path.GetFileName(settings.DeClickPluginPath)})", true));
                     deClickVst = new VstSampleProvider(
                         currentProvider,
                         settings.DeClickPluginPath,
                         1024,
-                        msg => progress.Report(new PipelineProgress(10, msg)));
+                        msg => progress.Report(new PipelineProgress(10, msg, true)));
                     currentProvider = deClickVst;
                 }
 
                 // 3. VST プラグイン 2: Voice De-noise
                 if (settings.EnableVoiceDeNoise && !string.IsNullOrWhiteSpace(settings.VoiceDeNoisePluginPath))
                 {
-                    progress.Report(new PipelineProgress(15, $"VST [Voice De-noise] を適用中..."));
+                    progress.Report(new PipelineProgress(15, $"VST [Voice De-noise] を適用中... ({Path.GetFileName(settings.VoiceDeNoisePluginPath)})", true));
                     deNoiseVst = new VstSampleProvider(
                         currentProvider,
                         settings.VoiceDeNoisePluginPath,
                         1024,
-                        msg => progress.Report(new PipelineProgress(15, msg)));
+                        msg => progress.Report(new PipelineProgress(15, msg, true)));
                     currentProvider = deNoiseVst;
                 }
 
@@ -85,7 +85,7 @@ public class AudioPipelineService
                 SilenceTruncationSampleProvider? silenceProvider = null;
                 if (settings.EnableSilenceTruncation)
                 {
-                    progress.Report(new PipelineProgress(20, $"無音自動カット設定: 閾値={settings.SilenceThresholdDb:F1}dB, 保持時間={settings.MinSilenceDurationMs}ms"));
+                    progress.Report(new PipelineProgress(20, $"無音自動カット設定: 閾値={settings.SilenceThresholdDb:F1}dB, 保持時間={settings.MinSilenceDurationMs}ms", true));
                     silenceProvider = new SilenceTruncationSampleProvider(
                         currentProvider,
                         settings.SilenceThresholdDb,
@@ -94,7 +94,7 @@ public class AudioPipelineService
                 }
 
                 // 5. MP3エンコード書き出し
-                progress.Report(new PipelineProgress(25, $"MP3エンコード準備: {settings.Mp3Bitrate} kbps -> {Path.GetFileName(outputFilePath)}"));
+                progress.Report(new PipelineProgress(25, $"MP3エンコード準備: {settings.Mp3Bitrate} kbps -> {Path.GetFileName(outputFilePath)}", true));
 
                 // MP3 (LAME) が対応しているサンプリングレート上限は 48,000Hz です。
                 // 96kHz などのハイレゾ音源の場合は、ポッドキャスト標準の 48kHz または 44.1kHz に自動リサンプリングします。
@@ -102,7 +102,7 @@ public class AudioPipelineService
                 if (originalSampleRate > 48000)
                 {
                     int targetSampleRate = (originalSampleRate % 44100 == 0) ? 44100 : 48000;
-                    progress.Report(new PipelineProgress(26, $"ハイレゾ音源 ({originalSampleRate}Hz) を MP3 標準サンプリングレート ({targetSampleRate}Hz) に高品質リサンプリング中..."));
+                    progress.Report(new PipelineProgress(26, $"ハイレゾ音源 ({originalSampleRate}Hz) を MP3 標準サンプリングレート ({targetSampleRate}Hz) に高品質リサンプリング中...", true));
                     currentProvider = new NAudio.Wave.SampleProviders.WdlResamplingSampleProvider(currentProvider, targetSampleRate);
                 }
 
@@ -112,10 +112,10 @@ public class AudioPipelineService
                 // LameMP3FileWriter によるエンコード
                 using (var writer = new LameMP3FileWriter(outputFilePath, pcmProvider.WaveFormat, settings.Mp3Bitrate))
                 {
-                    byte[] buffer = new byte[16384]; // 16KB バッファ
-                    long totalBytesRead = 0;
-                    long estimatedTotalBytes = reader.Length * (pcmProvider.WaveFormat.BitsPerSample / reader.WaveFormat.BitsPerSample);
+                    byte[] buffer = new byte[32768]; // 32KB バッファ
+                    long totalBytesWritten = 0;
                     DateTime lastReportTime = DateTime.UtcNow;
+                    int lastReportedMilestone = 25;
 
                     while (true)
                     {
@@ -125,17 +125,27 @@ public class AudioPipelineService
                         if (bytesRead == 0) break;
 
                         writer.Write(buffer, 0, bytesRead);
-                        totalBytesRead += bytesRead;
+                        totalBytesWritten += bytesRead;
 
-                        // 進捗率計算 (25% 〜 95%)
+                        // reader.Position / reader.Length に基づいて正確に進捗率 (25% 〜 95%) を計算
+                        double ratio = reader.Length > 0 
+                            ? Math.Clamp((double)reader.Position / reader.Length, 0.0, 1.0) 
+                            : 0.0;
+                        double percent = 25.0 + (ratio * 70.0);
+
+                        // プログレスバーの更新 (LogToConsole = false)
                         if ((DateTime.UtcNow - lastReportTime).TotalMilliseconds >= 250)
                         {
-                            double ratio = estimatedTotalBytes > 0 
-                                ? Math.Min(1.0, (double)reader.Position / reader.Length) 
-                                : 0.5;
-                            double percent = 25.0 + (ratio * 70.0);
-                            progress.Report(new PipelineProgress(percent, $"エンコード中... ({percent:F1}%)"));
+                            progress.Report(new PipelineProgress(percent, $"エンコード中... ({percent:F0}%)", false));
                             lastReportTime = DateTime.UtcNow;
+                        }
+
+                        // 25%ごとの主要マイルストーン時のみログに出力
+                        int milestone = ((int)percent / 25) * 25;
+                        if (milestone > lastReportedMilestone && milestone < 95)
+                        {
+                            progress.Report(new PipelineProgress(percent, $"音声処理・エンコード進行中: {milestone}% 完了", true));
+                            lastReportedMilestone = milestone;
                         }
                     }
                 }
