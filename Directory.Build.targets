@@ -26,12 +26,6 @@
     </ItemGroup>
   </Target>
 
-  <Target Name="DeployVstNet" AfterTargets="AfterBuild" Condition="'$(VstNetCliExe)' != ''">
-    <PropertyGroup>
-      <VstPlatform Condition="'$(Platform)' != 'x86' and '$(Platform)' != 'x64'">x64</VstPlatform>
-      <VstPlatform Condition="'$(Platform)' == 'x86' or '$(Platform)' == 'x64'">$(Platform)</VstPlatform>
-    </PropertyGroup>
-    <Error Text="VST.NET2 targets .NET 10 for Windows only." Condition="('$(TargetFrameworkIdentifier)' != '.NETCoreApp' or '$(OS)' != 'Windows_NT')" />
-    <Exec Command="$(VstNetCliExe) publish &quot;$(TargetPath)&quot; -o $(DeployOutput) -p $(VstPlatform)" />
-  </Target>
+  <!-- vstnet.exe publish はVSTプラグイン作成用であり、ホストアプリでは不要かつ不要な警告を出すため無効化 -->
+  <Target Name="DeployVstNet" AfterTargets="AfterBuild" />
 </Project>

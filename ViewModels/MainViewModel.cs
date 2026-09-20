@@ -30,7 +30,17 @@ public partial class MainViewModel : ObservableObject
 
     public LocalizationService Strings => LocalizationService.Instance;
 
-    public MainViewModel(SettingsService? settingsService = null)
+    /// <summary>
+    /// XAMLおよび既定のインスタンス化用パラメータなしコンストラクタ
+    /// </summary>
+    public MainViewModel() : this(null)
+    {
+    }
+
+    /// <summary>
+    /// 依存性注入（テスト等）用コンストラクタ
+    /// </summary>
+    public MainViewModel(SettingsService? settingsService)
     {
         _settingsService = settingsService ?? new SettingsService();
         _audioPipelineService = new AudioPipelineService();
