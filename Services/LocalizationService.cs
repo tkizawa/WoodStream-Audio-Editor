@@ -69,6 +69,7 @@ public class LocalizationService : INotifyPropertyChanged
     // 入出力
     public string InputFile => IsJapanese ? "入力音声ファイル (WAV / MP3):" : "Input Audio File (WAV / MP3):";
     public string OutputDirectory => IsJapanese ? "出力先フォルダ:" : "Output Folder:";
+    public string OutputFileNameLabel => IsJapanese ? "出力ファイル名:" : "Output File Name:";
     public string Browse => IsJapanese ? "参照..." : "Browse...";
     public string DragDropHint => IsJapanese ? "ここに音声ファイルをドラッグ＆ドロップできます" : "Drag and drop audio files here";
 

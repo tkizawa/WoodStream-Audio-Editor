@@ -1,6 +1,8 @@
 ## Build results
 [Bb]in/
 [Oo]bj/
+publish/
+
 
 ## Visual Studio / VS Code
 .vs/

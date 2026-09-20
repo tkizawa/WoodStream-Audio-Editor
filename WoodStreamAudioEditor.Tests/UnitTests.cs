@@ -891,4 +891,120 @@ public class UnitTests
         vm.TagTitle = "番号のない特番";
         Assert.AreEqual("0", vm.TagTrackNumber);
     }
+
+    /// <summary>
+    /// ログ表示用 TextBox (LogTextBox) が縦方向上揃え（VerticalContentAlignment == Top）になっているかの検証
+    /// </summary>
+    [STATestMethod]
+    public void TestLogTextBox_VerticalContentAlignmentIsTop()
+    {
+        if (System.Windows.Application.Current == null)
+        {
+            var app = new App { ShutdownMode = System.Windows.ShutdownMode.OnExplicitShutdown };
+            app.InitializeComponent();
+        }
+        var window = new MainWindow();
+        var logTextBox = window.FindName("LogTextBox") as System.Windows.Controls.TextBox;
+        Assert.IsNotNull(logTextBox, "LogTextBoxが見つかりません。");
+        Assert.AreEqual(System.Windows.VerticalAlignment.Top, logTextBox.VerticalContentAlignment);
+    }
+
+    /// <summary>
+    /// 出力MP3ファイル名「woodstream-podcast-xxx.mp3」（xxx: エピソード番号）の自動生成ロジックの検証
+    /// </summary>
+    [TestMethod]
+    public void TestGenerateOutputFileName_EpisodeNumber()
+    {
+        // 1. トラック番号（エピソード番号）から直接生成（例: 846 -> woodstream-podcast-846.mp3）
+        Assert.AreEqual("woodstream-podcast-846.mp3", MainViewModel.GenerateOutputFileName("846"));
+        Assert.AreEqual("woodstream-podcast-846.mp3", MainViewModel.GenerateOutputFileName("第846回"));
+        Assert.AreEqual("woodstream-podcast-123.mp3", MainViewModel.GenerateOutputFileName(" 123 "));
+
+        // 2. トラック番号が 0 の場合、タイトルから推定
+        Assert.AreEqual("woodstream-podcast-846.mp3", MainViewModel.GenerateOutputFileName("0", "第846回 10月のマイクロソフトのイベント"));
+        Assert.AreEqual("woodstream-podcast-900.mp3", MainViewModel.GenerateOutputFileName(null, "Episode 900 Milestone"));
+
+        // 3. タイトルからも判定できない場合、入力ファイル名から推定
+        Assert.AreEqual("woodstream-podcast-846.mp3", MainViewModel.GenerateOutputFileName("0", "", @"D:\Recordings\ep846.wav"));
+        Assert.AreEqual("woodstream-podcast-846.mp3", MainViewModel.GenerateOutputFileName("", "", @"D:\Recordings\第846回収録.wav"));
+
+        // 4. 番号が全くない場合は 0
+        Assert.AreEqual("woodstream-podcast-0.mp3", MainViewModel.GenerateOutputFileName("0", "番号なし", @"D:\Recordings\test.wav"));
+    }
+
+    /// <summary>
+    /// ViewModelのTagTitleやTagTrackNumberの変更に伴い、OutputFileNameがリアルタイムに連動更新されるかの検証
+    /// </summary>
+    [TestMethod]
+    public void TestViewModel_OutputFileNameBindingUpdates()
+    {
+        string tempSettings = Path.Combine(_tempDir, "vm_outputname_settings.json");
+        var service = new SettingsService(tempSettings);
+        var vm = new MainViewModel(service);
+
+        // タイトル設定によりトラック番号と出力ファイル名が連動更新
+        vm.TagTitle = "第846回 10月のマイクロソフトのイベント";
+        Assert.AreEqual("846", vm.TagTrackNumber);
+        Assert.AreEqual("woodstream-podcast-846.mp3", vm.OutputFileName);
+
+        // トラック番号を直接変更
+        vm.TagTrackNumber = "850";
+        Assert.AreEqual("woodstream-podcast-850.mp3", vm.OutputFileName);
+    }
+
+    /// <summary>
+    /// AudioPipelineService に outputFileName を指定した場合に woodstream-podcast-xxx.mp3 として書き出されるかの検証
+    /// </summary>
+    [TestMethod]
+    public async Task TestAudioPipelineService_GeneratesWoodstreamPodcastFileName()
+    {
+        string inputWav = Path.Combine(_tempDir, "input_ep846.wav");
+        CreateTestWav(inputWav, 2.0, 44100, 2);
+
+        var pipeline = new AudioPipelineService();
+        var settings = new AppSettings
+        {
+            Mp3Bitrate = 192,
+            EnableTrim = false,
+            EnableBgm = false,
+            EnableEnding = false,
+            EnableSilenceTruncation = false
+        };
+
+        var progress = new Progress<PipelineProgress>(_ => { });
+        string outputMp3 = await pipeline.ProcessAudioAsync(
+            inputWav,
+            _tempDir,
+            settings,
+            progress,
+            CancellationToken.None,
+            "woodstream-podcast-846.mp3");
+
+        Assert.IsTrue(File.Exists(outputMp3));
+        Assert.AreEqual("woodstream-podcast-846.mp3", Path.GetFileName(outputMp3));
+    }
+
+    private static void CreateTestWav(string path, double durationSeconds, int sampleRate = 44100, int channels = 2)
+    {
+        var format = new WaveFormat(sampleRate, 16, channels);
+        using var writer = new WaveFileWriter(path, format);
+        int totalSamples = (int)(sampleRate * durationSeconds);
+        byte[] buffer = new byte[totalSamples * channels * 2];
+        for (int i = 0; i < totalSamples; i++)
+        {
+            short sample = (short)(Math.Sin(2 * Math.PI * 440 * i / sampleRate) * 16000);
+            byte b1 = (byte)(sample & 0xFF);
+            byte b2 = (byte)((sample >> 8) & 0xFF);
+            int idx = i * channels * 2;
+            buffer[idx] = b1;
+            buffer[idx + 1] = b2;
+            if (channels == 2)
+            {
+                buffer[idx + 2] = b1;
+                buffer[idx + 3] = b2;
+            }
+        }
+        writer.Write(buffer, 0, buffer.Length);
+    }
 }
+

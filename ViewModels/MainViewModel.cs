@@ -64,6 +64,7 @@ public partial class MainViewModel : ObservableObject
     // 1. ファイル入出力プロパティ
     // ==========================================
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(OutputFileName))]
     private string _inputFilePath = string.Empty;
 
     [ObservableProperty]
@@ -167,6 +168,7 @@ public partial class MainViewModel : ObservableObject
     // 4. ID3 タグ情報
     // ==========================================
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(OutputFileName))]
     private string _tagTitle = string.Empty;
 
     /// <summary>
@@ -175,6 +177,64 @@ public partial class MainViewModel : ObservableObject
     partial void OnTagTitleChanged(string value)
     {
         TagTrackNumber = InferTrackNumberFromTitle(value);
+    }
+
+    /// <summary>
+    /// エピソード番号（またはタイトル・入力ファイル名から推定）に基づき、
+    /// 出力MP3ファイル名「woodstream-podcast-xxx.mp3」（xxxはエピソード番号）を取得します。
+    /// </summary>
+    public string OutputFileName => GenerateOutputFileName(TagTrackNumber, TagTitle, InputFilePath);
+
+    /// <summary>
+    /// エピソード番号（またはタイトル・入力ファイル名から推定）に基づき、
+    /// 出力MP3ファイル名「woodstream-podcast-xxx.mp3」（xxxはエピソード番号）を生成します。
+    /// </summary>
+    public static string GenerateOutputFileName(string? trackNumber, string? title = null, string? inputFilePath = null)
+    {
+        string episode = "0";
+
+        // 1. トラック番号から数字を抽出
+        if (!string.IsNullOrWhiteSpace(trackNumber))
+        {
+            string normalized = NormalizeDigits(trackNumber);
+            var match = Regex.Match(normalized, @"[0-9]+");
+            if (match.Success && uint.TryParse(match.Value, out uint num) && num > 0)
+            {
+                episode = num.ToString();
+            }
+        }
+
+        // 2. トラック番号から判定できない場合、タイトルから推定
+        if (episode == "0" && !string.IsNullOrWhiteSpace(title))
+        {
+            string inferred = InferTrackNumberFromTitle(title);
+            if (inferred != "0")
+            {
+                episode = inferred;
+            }
+        }
+
+        // 3. タイトルからも判定できない場合、入力ファイル名から推定
+        if (episode == "0" && !string.IsNullOrWhiteSpace(inputFilePath))
+        {
+            string fileName = Path.GetFileNameWithoutExtension(inputFilePath);
+            string inferred = InferTrackNumberFromTitle(fileName);
+            if (inferred != "0")
+            {
+                episode = inferred;
+            }
+            else
+            {
+                string normalized = NormalizeDigits(fileName);
+                var match = Regex.Match(normalized, @"[0-9]+");
+                if (match.Success && uint.TryParse(match.Value, out uint fileNum) && fileNum > 0)
+                {
+                    episode = fileNum.ToString();
+                }
+            }
+        }
+
+        return $"woodstream-podcast-{episode}.mp3";
     }
 
     /// <summary>
@@ -243,6 +303,7 @@ public partial class MainViewModel : ObservableObject
     private string _tagAlbum = "WoodStreamのデジタル生活";
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(OutputFileName))]
     private string _tagTrackNumber = "1";
 
     [ObservableProperty]
@@ -566,10 +627,13 @@ public partial class MainViewModel : ObservableObject
         StatusText = Strings.ProcessingStatus;
         _cts = new CancellationTokenSource();
 
+        string outputFileName = OutputFileName;
+
         AppendLog("==================================================");
         AppendLog($"[処理開始] {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
         AppendLog($"[入力] {InputFilePath}");
         AppendLog($"[出力フォルダ] {OutputDirectoryPath}");
+        AppendLog($"[出力ファイル名] {outputFileName}");
         AppendLog("==================================================");
 
         var progress = new Progress<PipelineProgress>(p =>
@@ -592,7 +656,8 @@ public partial class MainViewModel : ObservableObject
                 OutputDirectoryPath,
                 settings,
                 progress,
-                _cts.Token);
+                _cts.Token,
+                outputFileName);
 
             // 2. ID3 メタデータ埋め込み
             ProgressPercentage = 98;

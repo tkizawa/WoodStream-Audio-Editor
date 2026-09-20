@@ -27,7 +27,8 @@ public class AudioPipelineService
         string outputDirectory,
         AppSettings settings,
         IProgress<PipelineProgress> progress,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        string? outputFileName = null)
     {
         return await Task.Run(() =>
         {
@@ -42,7 +43,19 @@ public class AudioPipelineService
             }
 
             string inputFileNameWithoutExt = Path.GetFileNameWithoutExtension(inputFilePath);
-            string outputFilePath = Path.Combine(outputDirectory, $"{inputFileNameWithoutExt}_edited.mp3");
+            string finalFileName;
+            if (!string.IsNullOrWhiteSpace(outputFileName))
+            {
+                finalFileName = outputFileName.EndsWith(".mp3", StringComparison.OrdinalIgnoreCase)
+                    ? outputFileName
+                    : $"{outputFileName}.mp3";
+            }
+            else
+            {
+                finalFileName = $"{inputFileNameWithoutExt}_edited.mp3";
+            }
+
+            string outputFilePath = Path.Combine(outputDirectory, finalFileName);
 
             progress.Report(new PipelineProgress(0, $"入力音声ファイルを読み込み中: {Path.GetFileName(inputFilePath)}", true));
 
