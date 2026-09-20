@@ -9,6 +9,7 @@ using WoodStreamAudioEditor.Models;
 using WoodStreamAudioEditor.Services;
 using WoodStreamAudioEditor.Services.Audio;
 using WoodStreamAudioEditor.Services.Metadata;
+using WoodStreamAudioEditor.ViewModels;
 
 namespace WoodStreamAudioEditor.Tests;
 
@@ -39,13 +40,15 @@ public class UnitTests
     [TestMethod]
     public void TestSettingsSaveAndLoad_UnescapedUtf8()
     {
-        var service = new SettingsService();
+        string testSettingsPath = Path.Combine(_tempDir, "settings.json");
+        var service = new SettingsService(testSettingsPath);
         var testSettings = new AppSettings
         {
             DefaultArtist = "木澤 朋和（テスト）",
             DefaultAlbum = "WoodStreamのデジタル生活（テスト）",
             DefaultTitle = "第999回 マイクロソフトの最新技術",
             DefaultTrackNumber = "999",
+            DefaultYear = "2026",
             Mp3Bitrate = 256,
             SilenceThresholdDb = -42.5,
             MinSilenceDurationMs = 350,
@@ -73,6 +76,7 @@ public class UnitTests
         Assert.AreEqual(testSettings.DefaultAlbum, loaded.DefaultAlbum);
         Assert.AreEqual(testSettings.DefaultTitle, loaded.DefaultTitle);
         Assert.AreEqual(testSettings.DefaultTrackNumber, loaded.DefaultTrackNumber);
+        Assert.AreEqual("2026", loaded.DefaultYear);
         Assert.AreEqual(256, loaded.Mp3Bitrate);
         Assert.AreEqual(-42.5, loaded.SilenceThresholdDb);
         Assert.AreEqual(350, loaded.MinSilenceDurationMs);
@@ -93,12 +97,8 @@ public class UnitTests
         Assert.AreEqual(false, loaded.IsMaximized);
 
         // ファイル内容を直接読み取って Unicode エスケープ (\uXXXX) されていないことを検証
-        string appDataPath = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "WoodStream Audio Editor", "settings.json");
-
-        Assert.IsTrue(File.Exists(appDataPath));
-        string jsonText = File.ReadAllText(appDataPath, Encoding.UTF8);
+        Assert.IsTrue(File.Exists(testSettingsPath));
+        string jsonText = File.ReadAllText(testSettingsPath, Encoding.UTF8);
 
         Assert.IsTrue(jsonText.Contains("木澤 朋和"), "日本語テキストが直接可視テキストとして含まれていること");
         Assert.IsTrue(jsonText.Contains("WoodStreamのデジタル生活"), "番組名が直接可視テキストとして含まれていること");
@@ -185,6 +185,7 @@ public class UnitTests
             Artist: "木澤 朋和",
             Album: "WoodStreamのデジタル生活",
             TrackNumber: "100",
+            Year: "2026",
             ArtworkPath: testArtworkPath);
 
         await service.ApplyMetadataAsync(testMp3Path, metadata);
@@ -195,6 +196,7 @@ public class UnitTests
         Assert.AreEqual("木澤 朋和", taggedFile.Tag.FirstPerformer);
         Assert.AreEqual("WoodStreamのデジタル生活", taggedFile.Tag.Album);
         Assert.AreEqual(100u, taggedFile.Tag.Track);
+        Assert.AreEqual(2026u, taggedFile.Tag.Year);
         Assert.IsTrue(taggedFile.Tag.Pictures.Length > 0, "アートワーク画像が埋め込まれていること");
     }
 
@@ -275,6 +277,7 @@ public class UnitTests
             Artist: "木澤 朋和",
             Album: "WoodStreamのデジタル生活",
             TrackNumber: "42",
+            Year: "2026",
             ArtworkPath: string.Empty);
 
         await metadataService.ApplyMetadataAsync(outputMp3, metadata);
@@ -285,6 +288,7 @@ public class UnitTests
         Assert.AreEqual("木澤 朋和", mp3File.Tag.FirstPerformer);
         Assert.AreEqual("WoodStreamのデジタル生活", mp3File.Tag.Album);
         Assert.AreEqual(42u, mp3File.Tag.Track);
+        Assert.AreEqual(2026u, mp3File.Tag.Year);
 
         // 再生時間の検証 (元6秒から2秒無音が約0.3秒に短縮され、約4.3秒になっていること)
         Assert.IsTrue(mp3File.Properties.Duration.TotalSeconds < 5.5, 
@@ -836,5 +840,55 @@ public class UnitTests
             _position += toCopy;
             return toCopy;
         }
+    }
+
+    /// <summary>
+    /// タイトル文字列からのトラック番号自動推定の検証
+    /// </summary>
+    [TestMethod]
+    public void TestInferTrackNumberFromTitle()
+    {
+        // ユーザー指定の例
+        string example = "第846回 10月のマイクロソフトのイベント・Windows 11 Insider Preview・新コミュニティサイトWoodStream PLAZA開設 (2026/9/20)";
+        Assert.AreEqual("846", MainViewModel.InferTrackNumberFromTitle(example));
+
+        // 全角数字のテスト
+        Assert.AreEqual("846", MainViewModel.InferTrackNumberFromTitle("第８４６回 テスト配信"));
+
+        // スペース区切りのテスト
+        Assert.AreEqual("123", MainViewModel.InferTrackNumberFromTitle("第 123 回 スペースあり"));
+
+        // #表記、Ep表記のテスト
+        Assert.AreEqual("846", MainViewModel.InferTrackNumberFromTitle("#846 番組タイトル"));
+        Assert.AreEqual("846", MainViewModel.InferTrackNumberFromTitle("Episode 846 Title"));
+        Assert.AreEqual("846", MainViewModel.InferTrackNumberFromTitle("Ep.846 Title"));
+
+        // 「846回」表記
+        Assert.AreEqual("846", MainViewModel.InferTrackNumberFromTitle("846回 特別編"));
+
+        // 判定できない場合は "0"
+        Assert.AreEqual("0", MainViewModel.InferTrackNumberFromTitle("回数のないタイトル"));
+        Assert.AreEqual("0", MainViewModel.InferTrackNumberFromTitle(""));
+        Assert.AreEqual("0", MainViewModel.InferTrackNumberFromTitle(null));
+    }
+
+    /// <summary>
+    /// ViewModel で TagTitle を変更した際に TagTrackNumber が連動して自動更新されるかの検証
+    /// </summary>
+    [TestMethod]
+    public void TestViewModel_TagTitleChangeUpdatesTrackNumber()
+    {
+        string tempSettings = Path.Combine(_tempDir, "vm_settings.json");
+        var service = new SettingsService(tempSettings);
+        var vm = new MainViewModel(service);
+
+        vm.TagTitle = "第846回 10月のマイクロソフトのイベント・Windows 11 Insider Preview・新コミュニティサイトWoodStream PLAZA開設 (2026/9/20)";
+        Assert.AreEqual("846", vm.TagTrackNumber);
+
+        vm.TagTitle = "第900回 次の節目";
+        Assert.AreEqual("900", vm.TagTrackNumber);
+
+        vm.TagTitle = "番号のない特番";
+        Assert.AreEqual("0", vm.TagTrackNumber);
     }
 }

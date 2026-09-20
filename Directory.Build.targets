@@ -1,0 +1,37 @@
+<Project>
+  <Target Name="PlatformCheckHost" BeforeTargets="InjectReferenceHost">
+    <!-- Suppress error by overriding PlatformCheckHost -->
+  </Target>
+
+  <ItemGroup Condition="'$(Platform)' != 'x86' and '$(Platform)' != 'x64'">
+    <None Remove="$(NuGetPackageRoot)vst.net2-host\2.1.10\runtimes\win-$(Platform)\native\ijwhost.dll" />
+    <None Include="$(NuGetPackageRoot)vst.net2-host\2.1.10\runtimes\win-x64\native\ijwhost.dll">
+      <Link>Ijwhost.dll</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+  <Target Name="InjectReferenceHost" BeforeTargets="ResolveAssemblyReferences">
+    <PropertyGroup>
+      <VstPlatform Condition="'$(Platform)' != 'x86' and '$(Platform)' != 'x64'">x64</VstPlatform>
+      <VstPlatform Condition="'$(Platform)' == 'x86' or '$(Platform)' == 'x64'">$(Platform)</VstPlatform>
+    </PropertyGroup>
+    <ItemGroup>
+      <Reference Include="Jacobi.Vst.Core">
+        <HintPath>$(NuGetPackageRoot)vst.net2-host\2.1.10\lib\$(TargetFramework)\$(VstPlatform)\Jacobi.Vst.Core.dll</HintPath>
+      </Reference>
+      <Reference Include="Jacobi.Vst.Host.Interop">
+        <HintPath>$(NuGetPackageRoot)vst.net2-host\2.1.10\lib\$(TargetFramework)\$(VstPlatform)\Jacobi.Vst.Host.Interop.dll</HintPath>
+      </Reference>
+    </ItemGroup>
+  </Target>
+
+  <Target Name="DeployVstNet" AfterTargets="AfterBuild" Condition="'$(VstNetCliExe)' != ''">
+    <PropertyGroup>
+      <VstPlatform Condition="'$(Platform)' != 'x86' and '$(Platform)' != 'x64'">x64</VstPlatform>
+      <VstPlatform Condition="'$(Platform)' == 'x86' or '$(Platform)' == 'x64'">$(Platform)</VstPlatform>
+    </PropertyGroup>
+    <Error Text="VST.NET2 targets .NET 10 for Windows only." Condition="('$(TargetFrameworkIdentifier)' != '.NETCoreApp' or '$(OS)' != 'Windows_NT')" />
+    <Exec Command="$(VstNetCliExe) publish &quot;$(TargetPath)&quot; -o $(DeployOutput) -p $(VstPlatform)" />
+  </Target>
+</Project>

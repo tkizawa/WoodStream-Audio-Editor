@@ -118,6 +118,7 @@ public class LocalizationService : INotifyPropertyChanged
     public string TagArtist => IsJapanese ? "アーティスト名:" : "Artist / Host:";
     public string TagAlbum => IsJapanese ? "アルバム名 (番組名):" : "Album / Show Name:";
     public string TagTrack => IsJapanese ? "トラック番号 (回数):" : "Track Number (Episode #):";
+    public string TagYear => IsJapanese ? "年 (Year):" : "Year:";
     public string TagArtwork => IsJapanese ? "アートワーク画像 (JPEG/PNG):" : "Artwork Image (JPEG/PNG):";
     public string SelectImage => IsJapanese ? "画像選択..." : "Select Image...";
     public string ClearImage => IsJapanese ? "クリア" : "Clear";

@@ -14,11 +14,28 @@ namespace WoodStreamAudioEditor.Services;
 /// </summary>
 public class SettingsService
 {
-    private static readonly string AppDirectory = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "WoodStream Audio Editor");
+    private readonly string _appDirectory;
+    private readonly string _settingsFilePath;
 
-    private static readonly string SettingsFilePath = Path.Combine(AppDirectory, "settings.json");
+    /// <summary>
+    /// コンストラクタ。パスを省略した場合は既定の %LOCALAPPDATA%\WoodStream Audio Editor\settings.json を使用します。
+    /// テスト時は一時パスを渡すことで本番環境の設定ファイル汚染を防止できます。
+    /// </summary>
+    public SettingsService(string? customSettingsFilePath = null)
+    {
+        if (!string.IsNullOrWhiteSpace(customSettingsFilePath))
+        {
+            _settingsFilePath = customSettingsFilePath;
+            _appDirectory = Path.GetDirectoryName(customSettingsFilePath) ?? string.Empty;
+        }
+        else
+        {
+            _appDirectory = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "WoodStream Audio Editor");
+            _settingsFilePath = Path.Combine(_appDirectory, "settings.json");
+        }
+    }
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -35,9 +52,9 @@ public class SettingsService
     {
         try
         {
-            if (File.Exists(SettingsFilePath))
+            if (File.Exists(_settingsFilePath))
             {
-                var json = File.ReadAllText(SettingsFilePath);
+                var json = File.ReadAllText(_settingsFilePath);
                 var settings = JsonSerializer.Deserialize<AppSettings>(json, JsonOptions);
                 if (settings != null)
                 {
@@ -61,13 +78,13 @@ public class SettingsService
     {
         try
         {
-            if (!Directory.Exists(AppDirectory))
+            if (!string.IsNullOrEmpty(_appDirectory) && !Directory.Exists(_appDirectory))
             {
-                Directory.CreateDirectory(AppDirectory);
+                Directory.CreateDirectory(_appDirectory);
             }
 
             var json = JsonSerializer.Serialize(settings, JsonOptions);
-            File.WriteAllText(SettingsFilePath, json);
+            File.WriteAllText(_settingsFilePath, json);
         }
         catch (Exception ex)
         {

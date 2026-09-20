@@ -2,6 +2,7 @@ using System;
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
@@ -29,9 +30,9 @@ public partial class MainViewModel : ObservableObject
 
     public LocalizationService Strings => LocalizationService.Instance;
 
-    public MainViewModel()
+    public MainViewModel(SettingsService? settingsService = null)
     {
-        _settingsService = new SettingsService();
+        _settingsService = settingsService ?? new SettingsService();
         _audioPipelineService = new AudioPipelineService();
         _metadataService = new MetadataService();
 
@@ -158,6 +159,73 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty]
     private string _tagTitle = string.Empty;
 
+    /// <summary>
+    /// タイトル変更時にトラック番号（回数）を自動推定して反映します。
+    /// </summary>
+    partial void OnTagTitleChanged(string value)
+    {
+        TagTrackNumber = InferTrackNumberFromTitle(value);
+    }
+
+    /// <summary>
+    /// タイトル文字列からエピソード回数・トラック番号を推定します。
+    /// 例: 「第846回 ...」 -> "846"
+    /// 判定できない場合は "0" を返します。
+    /// </summary>
+    public static string InferTrackNumberFromTitle(string? title)
+    {
+        if (string.IsNullOrWhiteSpace(title))
+        {
+            return "0";
+        }
+
+        // 全角数字を半角数字に変換して正規化
+        string normalized = NormalizeDigits(title);
+
+        // パターン1: 「第846回」「第 846 回」
+        var match = Regex.Match(normalized, @"第\s*([0-9]+)\s*回");
+        if (match.Success && uint.TryParse(match.Groups[1].Value, out uint num1))
+        {
+            return num1.ToString();
+        }
+
+        // パターン2: 「846回」
+        match = Regex.Match(normalized, @"(?<![0-9])([0-9]+)\s*回");
+        if (match.Success && uint.TryParse(match.Groups[1].Value, out uint num2))
+        {
+            return num2.ToString();
+        }
+
+        // パターン3: 「#846」「# 846」
+        match = Regex.Match(normalized, @"#\s*([0-9]+)");
+        if (match.Success && uint.TryParse(match.Groups[1].Value, out uint num3))
+        {
+            return num3.ToString();
+        }
+
+        // パターン4: 「Ep.846」「Episode 846」「EP846」
+        match = Regex.Match(normalized, @"\b(?:Episode|Ep\.?|EP)\s*([0-9]+)\b", RegexOptions.IgnoreCase);
+        if (match.Success && uint.TryParse(match.Groups[1].Value, out uint num4))
+        {
+            return num4.ToString();
+        }
+
+        return "0";
+    }
+
+    private static string NormalizeDigits(string input)
+    {
+        char[] chars = input.ToCharArray();
+        for (int i = 0; i < chars.Length; i++)
+        {
+            if (chars[i] >= '０' && chars[i] <= '９')
+            {
+                chars[i] = (char)(chars[i] - '０' + '0');
+            }
+        }
+        return new string(chars);
+    }
+
     [ObservableProperty]
     private string _tagArtist = "木澤 朋和";
 
@@ -166,6 +234,9 @@ public partial class MainViewModel : ObservableObject
 
     [ObservableProperty]
     private string _tagTrackNumber = "1";
+
+    [ObservableProperty]
+    private string _tagYear = DateTime.Now.Year.ToString();
 
     [ObservableProperty]
     private string _tagArtworkPath = string.Empty;
@@ -521,6 +592,7 @@ public partial class MainViewModel : ObservableObject
                 TagArtist,
                 TagAlbum,
                 TagTrackNumber,
+                TagYear,
                 TagArtworkPath);
 
             await _metadataService.ApplyMetadataAsync(generatedMp3Path, metadata, AppendLog);
@@ -620,6 +692,8 @@ public partial class MainViewModel : ObservableObject
 
         TagArtist = settings.DefaultArtist;
         TagAlbum = settings.DefaultAlbum;
+        TagTrackNumber = string.IsNullOrWhiteSpace(settings.DefaultTrackNumber) ? "1" : settings.DefaultTrackNumber;
+        TagYear = string.IsNullOrWhiteSpace(settings.DefaultYear) ? DateTime.Now.Year.ToString() : settings.DefaultYear;
         TagArtworkPath = settings.DefaultArtworkPath;
         if (!string.IsNullOrWhiteSpace(settings.DefaultTitle))
         {
@@ -681,6 +755,7 @@ public partial class MainViewModel : ObservableObject
             DefaultArtist = TagArtist,
             DefaultAlbum = TagAlbum,
             DefaultTrackNumber = TagTrackNumber,
+            DefaultYear = TagYear,
             DefaultArtworkPath = TagArtworkPath
         };
     }

@@ -12,10 +12,11 @@ public record AudioMetadata(
     string Artist,
     string Album,
     string TrackNumber,
+    string Year,
     string ArtworkPath);
 
 /// <summary>
-/// TagLib# を使用して MP3 ファイルに ID3v2 タグ（タイトル、アーティスト、アルバム、トラック、アートワーク画像）を埋め込むサービス
+/// TagLib# を使用して MP3 ファイルに ID3v2 タグ（タイトル、アーティスト、アルバム、トラック、リリース年、アートワーク画像）を埋め込むサービス
 /// </summary>
 public class MetadataService
 {
@@ -59,6 +60,12 @@ public class MetadataService
                 if (uint.TryParse(metadata.TrackNumber, out uint track))
                 {
                     file.Tag.Track = track;
+                }
+
+                // リリース年
+                if (uint.TryParse(metadata.Year, out uint year) && year > 0)
+                {
+                    file.Tag.Year = year;
                 }
 
                 // アートワーク画像

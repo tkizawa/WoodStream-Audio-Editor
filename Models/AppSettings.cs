@@ -60,5 +60,6 @@ public class AppSettings
     public string DefaultArtist { get; set; } = "木澤 朋和";
     public string DefaultAlbum { get; set; } = "WoodStreamのデジタル生活";
     public string DefaultTrackNumber { get; set; } = "1";
+    public string DefaultYear { get; set; } = string.Empty;
     public string DefaultArtworkPath { get; set; } = string.Empty;
 }

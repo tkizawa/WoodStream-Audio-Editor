@@ -71,14 +71,14 @@
 git clone https://github.com/tkizawa/WoodStream-Audio-Editor.git
 cd WoodStream-Audio-Editor
 
-# ビルド (x64)
-dotnet build -p:Platform=x64
+# ビルド
+dotnet build
 
 # テスト実行
-dotnet test -p:Platform=x64
+dotnet test
 
 # アプリケーションの起動
-dotnet run --project WoodStreamAudioEditor\WoodStreamAudioEditor.csproj -p:Platform=x64
+dotnet run
 ```
 
 ---
